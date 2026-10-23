@@ -1,19 +1,12 @@
-# public-template
+# residencyapps
 
-Template for public repositories. Click "Use this template" to start a new repo with these already set up:
+NUHS Residency Applications: confidential feedback on residency applicants. Respondents sign in with a passcode, score each
+applicant and add a comment; the selection committee reads the results. Live at residencyapps.anawj.com once set up
+(`?demo` shows made-up applicants and every role).
 
-- `.claude/settings.json`: allow rules (git, PR tools, tests) so cloud sessions rarely prompt, and deny-reads for
-  `__/` and `vendor/` to save tokens. Only read when a session has exactly one repo attached (else the
-  environment's shared settings apply).
-- `AGENTS.md` / `CLAUDE.md`: shared AI instructions skeleton (fill the placeholders).
-- `.claude/skills/quick-save`: cheap end-of-session save.
-- `STATUS.md`, `NOTES.md`: state files the skill updates.
-- `tools/`: `check.mjs` (repo checks + Worker tests; run before merging), `stamp-versions.mjs` (service-worker
-  VERSION per deploy), `proofread.mjs` (page and doc mistakes; `--live` checks the real addresses), `shots.mjs`
-  (phone screenshots by hand).
-- A Cloudflare Worker that serves the apps: `worker/sites.js`, `worker/routes.js` (which folder each address
-  serves), its tests in `worker/test/`, and `wrangler.jsonc` with preview links and workers.dev off.
-- `example/`: a tiny app with a service worker; replace it and update `SITES` in `worker/routes.js`.
+- `applicants/`: the app (static files; `js/app.js` screens, `js/model.js` logic, `js/store.js` Firestore, `js/cloud.js` sign-in)
+- `firestore.rules`: who may read and write what (Firebase project `residencyapps`)
+- `worker/`: the Cloudflare Worker that serves the app and the passcode sign-in (`guest.js`)
+- `test/`: model, browser and rules tests; `tools/`: repo checks
 
-Templates don't copy repo settings: after creating a repo, run the owner's admin workflow `repo-defaults` (auto-delete
-head branches, auto-merge, Actions PRs) instead of ticking them by hand.
+How to work here: `AGENTS.md`. Lasting rules and lessons: `NOTES.md`. Now and next: `STATUS.md`.

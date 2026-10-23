@@ -1,0 +1,137 @@
+rules_version = '2';
+
+// Residency applicants feedback (applicants/): the only app in the Firebase project residencyapps, so this is the whole
+// rules file. Tested by test/rules.emulator.mjs (tools/test-rules.sh). Anything not matched below is denied.
+//
+// Who is who:
+// - Passcode accounts (worker/guest.js issues a custom token: claim guest, a role, no email). guest sends feedback;
+//   setup sets a round up (round and photos, never the answers); committee reads every answer and changes nothing.
+// - Admins: a Google sign-in whose email is in admins/{email} (added by hand in the Firebase console). They change the
+//   passcodes and the committee list, and run the retention delete.
+// - The committee list: selectionCommittee/{email}, Google sign-ins that read the results (kept by admins).
+// The collection names (selection, selectionCommittee, selectionCodes) are kept from the app's first home, so copied data fits.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function me() {
+      return request.auth.token.email.lower();
+    }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(me()));
+    }
+    function selCommittee() {
+      return signedIn() && exists(/databases/$(database)/documents/selectionCommittee/$(me()));
+    }
+    function isPasscode() {
+      return request.auth != null && request.auth.token.guest == true && !('email' in request.auth.token);
+    }
+    // tokens issued before roles existed have no role claim: guests
+    function isGuest() {
+      return isPasscode() && (!('role' in request.auth.token) || request.auth.token.role == 'guest');
+    }
+    function isSetupCode() {
+      return isPasscode() && request.auth.token.get('role', '') == 'setup';
+    }
+    function isCommitteeCode() {
+      return isPasscode() && request.auth.token.get('role', '') == 'committee';
+    }
+    // the Worker's service sign-in that reads the passcodes (claim codesReader, no email)
+    function isCodesReader() {
+      return request.auth != null && request.auth.token.get('codesReader', false) == true && !('email' in request.auth.token);
+    }
+    function selStaff() {
+      return isAdmin() || isSetupCode();
+    }
+    function selReader() {
+      return isGuest() || isSetupCode() || isCommitteeCode() || isAdmin() || selCommittee();
+    }
+    function resultsReader() {
+      return isAdmin() || selCommittee() || isCommitteeCode();
+    }
+    function optString(d, k, max) {
+      return !(k in d) || d[k] == null || (d[k] is string && d[k].size() <= max);
+    }
+    function optNumber(d, k) {
+      return !(k in d) || d[k] == null || d[k] is number;
+    }
+    // a round takes answers while it is open and inside its dates (opensAt and closesAt, ms; either may be missing)
+    function acceptsAnswers(r) {
+      return r.status == 'open'
+        && (!('opensAt' in r) || r.opensAt == null || request.time.toMillis() >= r.opensAt)
+        && (!('closesAt' in r) || r.closesAt == null || request.time.toMillis() < r.closesAt);
+    }
+
+    // admins/{email}: each admin may check their own entry; the list is kept in the console
+    match /admins/{email} {
+      allow get: if signedIn() && email == me();
+    }
+
+    match /selectionCommittee/{email} {
+      allow get: if signedIn() && email == me();
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() && email == email.lower()
+        && request.resource.data.keys().hasOnly(['name'])
+        && optString(request.resource.data, 'name', 200);
+      allow delete: if isAdmin();
+    }
+
+    // the three passcodes, changed on the Set up page: selectionCodes/{guest|setup|committee} { code, updatedAt }.
+    // A role with none here uses the Worker secret of the same name.
+    match /selectionCodes/{role} {
+      allow read: if isAdmin() || isCodesReader();
+      allow create, update: if isAdmin() && role in ['guest', 'setup', 'committee']
+        && request.resource.data.keys().hasOnly(['code', 'updatedAt'])
+        && request.resource.data.code is string && request.resource.data.code.size() >= 6 && request.resource.data.code.size() <= 100
+        && optNumber(request.resource.data, 'updatedAt');
+      allow delete: if isAdmin();
+    }
+
+    match /selection/{cycle} {
+      allow read: if selReader();
+      allow create, update: if selStaff() && cycle.size() <= 20 && validSelRound(cycle, request.resource.data);
+      allow delete: if isAdmin();
+      // passport photos (a few KB of base64 JPEG each): everyone who reads the round sees them; set-up keeps them
+      match /photos/{aid} {
+        allow read: if selReader();
+        allow create, update: if selStaff() && aid.size() <= 20 && validSelPhoto(request.resource.data);
+        allow delete: if selStaff();
+      }
+      // one response per guest (guest-<uid>); answers copied from the first home keep their email ids and stay readable
+      match /responses/{rid} {
+        allow get: if isGuest() && rid == 'guest-' + request.auth.uid;
+        allow read: if resultsReader();
+        allow create, update: if isGuest() && rid == 'guest-' + request.auth.uid
+          && acceptsAnswers(get(/databases/$(database)/documents/selection/$(cycle)).data)
+          && validSelResponse(rid, request.resource.data);
+        // the retention delete (Set up, admins only)
+        allow delete: if isAdmin();
+      }
+    }
+    function validSelRound(cycle, d) {
+      return d.keys().hasOnly(['cycle', 'title', 'status', 'applicants', 'questions', 'form', 'mirror', 'opensAt', 'closesAt', 'updatedAt'])
+        && d.cycle == cycle
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && d.status in ['open', 'closed']
+        && d.applicants is list && d.applicants.size() >= 1 && d.applicants.size() <= 200
+        && (!('questions' in d) || (d.questions is list && d.questions.size() >= 1 && d.questions.size() <= 10))
+        && (!('mirror' in d) || d.mirror is bool)
+        && (!('form' in d) || (d.form is map && d.form.keys().hasOnly(['id', 'nameEntry']) && d.form.id is string && d.form.id.size() <= 80 && d.form.nameEntry is int))
+        && optNumber(d, 'opensAt') && optNumber(d, 'closesAt')
+        && optNumber(d, 'updatedAt');
+    }
+    function validSelPhoto(d) {
+      return d.keys().hasOnly(['jpeg', 'updatedAt'])
+        && d.jpeg is string && d.jpeg.size() > 0 && d.jpeg.size() <= 80000
+        && optNumber(d, 'updatedAt');
+    }
+    function validSelResponse(rid, d) {
+      return d.keys().hasOnly(['email', 'name', 'answers', 'updatedAt'])
+        && d.email == rid
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 120
+        && d.answers is map && d.answers.size() <= 200
+        && d.updatedAt == request.time;
+    }
+  }
+}
