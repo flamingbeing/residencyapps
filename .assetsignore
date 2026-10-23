@@ -8,3 +8,6 @@ node_modules
 *.md
 wrangler.jsonc
 package.json
+test
+firestore.rules
+firebase.json

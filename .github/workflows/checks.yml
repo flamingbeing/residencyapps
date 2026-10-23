@@ -1,0 +1,60 @@
+# The merge checklist from AGENTS.md, on every PR and every push to main: the repo check (with the Worker tests), the model
+# tests, the proof-read, the Firestore rules in the emulator, and the browser test at phone size with axe.
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Repo check (and Worker tests)
+        run: node tools/check.mjs
+      - name: Model tests
+        run: node test/model.test.mjs
+      - name: Proof-read (pages and documents)
+        run: node tools/proofread.mjs
+
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Firestore rules (local emulator, demo project)
+        run: bash tools/test-rules.sh
+
+  browser:
+    runs-on: ubuntu-24.04   # Playwright 1.56.1 has no browser deps for ubuntu-latest (26.04)
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install a browser and axe
+        run: |
+          npm install -g playwright@1.56.1 axe-core@4
+          playwright install --with-deps chromium
+      - name: Test
+        run: |
+          export PLAYWRIGHT_PATH="$(npm root -g)/playwright/index.mjs" AXE_PATH="$(npm root -g)/axe-core/axe.min.js"
+          node test/e2e.mjs

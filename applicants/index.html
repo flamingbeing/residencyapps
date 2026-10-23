@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>NUHS Residency Applications</title>
+<meta name="description" content="Confidential feedback on residency applicants.">
+<meta name="theme-color" content="#f9f9fb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Applicants">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" media="print" onload="this.media='all'">
+<script>
+  // the theme chosen on this device (js/ui.js, THEME_KEY), before the first paint
+  try { var t = localStorage.getItem('residencyapps-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; if (t === 'dark') document.querySelector('meta[name="theme-color"]').content = '#161618'; } catch (e) {}
+</script>
+<link rel="stylesheet" href="https://design.anawj.com/v1/tokens.css">
+<link rel="stylesheet" href="https://design.anawj.com/v1/app.css">
+<link rel="stylesheet" href="style.css">
+<script src="https://design.anawj.com/v1/app.js" defer></script>
+<style>
+  .sl-col { max-width: 720px; margin: 0 auto; }
+  .sl-lockbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--a-surface-2); font-size: var(--a-text-sm); color: var(--a-ink-2); }
+  .sl-lock { display: block; }
+  .sl-code-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+  .sl-code-head--row { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+  .sl-codebox { padding: 12px 0; border-top: .5px solid var(--a-sep); }
+  .sl-codebox:first-child { border-top: 0; padding-top: 0; }
+  .sl-codeline { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .sl-codeval { font: 16px/1.4 ui-monospace, monospace; word-break: break-all; }
+  .sl-codein { font-family: ui-monospace, monospace; }
+  .sl-intro p { margin: 0 0 8px; }
+  .sl-conf { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--a-surface-2); font-size: var(--a-text-sm); color: var(--a-ink-2); }
+  .sl-bar { height: 6px; border-radius: 3px; background: var(--a-surface-2); overflow: hidden; margin: 10px 0 4px; }
+  .sl-bar > i { display: block; height: 100%; background: var(--a-tint); }
+  /* the questionnaire: one applicant at a time, the Next bar fixed at the bottom so nothing needs scrolling to reach it */
+  .sl-apply { padding-bottom: 84px; }
+  .sl-toprow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .sl-pos { font-size: var(--a-text-sm); color: var(--a-ink-2); font-weight: 600; }
+  .sl-card { margin-top: 10px; }
+  .sl-who-row { display: flex; gap: 14px; align-items: flex-start; }
+  .sl-who-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .sl-name { margin: 0; font-size: 20px; line-height: 1.2; }
+  .sl-apstat { font-size: var(--a-text-xs); font-weight: 600; color: var(--a-ink-2); min-height: 1.2em; }
+  .sl-na { min-height: 44px; padding: 8px 14px; border-radius: 12px; border: 1.5px solid var(--a-tint); background: transparent; color: var(--a-tint); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+  .sl-na[aria-pressed="true"] { background: var(--a-tint); color: #fff; }
+  .sl-na:focus-visible, .sl-tile:focus-visible { outline: 3px solid var(--a-focus); outline-offset: 2px; }
+  .sl-skipped { margin: 14px 0 0; }
+  .sl-qs { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .sl-q { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .sl-q__label { display: block; padding: 0; margin: 0 0 6px; font-weight: 600; font-size: var(--a-text-sm); }
+  .sl-req, .sl-opt { font-weight: 400; color: var(--a-ink-2); font-size: var(--a-text-xs); }
+  .sl-scores { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .sl-scores label { position: relative; display: flex; align-items: center; justify-content: center; min-height: 56px; border-radius: 12px; background: var(--a-surface-2); cursor: pointer; }
+  .sl-scores input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+  .sl-scores b { font-size: 22px; line-height: 1; }
+  .sl-scores label:has(input:checked) { background: var(--a-tint); color: #fff; }
+  .sl-scores label:has(input:focus-visible) { outline: 3px solid var(--a-focus); outline-offset: 2px; }
+  .sl-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: var(--a-text-xs); color: var(--a-ink-2); }
+  .sl-ta { min-height: 56px; }
+  .sl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+  .sl-chip { min-height: 44px; padding: 8px 14px; border-radius: 22px; border: 1.5px solid var(--a-tint); background: transparent; color: var(--a-tint); font: inherit; font-size: var(--a-text-sm); font-weight: 600; cursor: pointer; }
+  .sl-chip[aria-pressed="true"] { background: var(--a-tint); color: #fff; }
+  .sl-chip:focus-visible { outline: 3px solid var(--a-focus); outline-offset: 2px; }
+  .sl-saved { font-size: var(--a-text-xs); color: var(--a-ink-2); min-width: 3em; text-align: center; }
+  .sl-fixed { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--a-surface); border-top: .5px solid var(--a-sep); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .sl-fixed__in { max-width: 720px; margin: 0 auto; display: flex; align-items: center; gap: 10px; }
+  .sl-fixed__in .a-btn { flex: 1; }
+  .sl-fixed__in .sl-saved { flex: 0 0 auto; }
+  /* photos: passport shaped, 7:9 */
+  .sl-photo { display: block; aspect-ratio: 7 / 9; width: 100%; height: auto; object-fit: cover; border-radius: 8px; background: var(--a-surface-2); }
+  .sl-photo--lg { width: 84px; flex: none; }
+  .sl-photo--sm { width: 32px; flex: none; border-radius: 4px; }
+  .sl-photo--none { display: grid; place-items: center; color: var(--a-ink-2); font-weight: 700; font-size: 18px; }
+  .sl-photo--sm.sl-photo--none { font-size: 11px; }
+  .sl-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (min-width: 560px) { .sl-grid { grid-template-columns: repeat(4, 1fr); } }
+  .sl-tile { width: 100%; padding: 6px; border: 0; border-radius: 12px; background: var(--a-surface); color: var(--a-ink); font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; align-items: stretch; text-align: left; box-shadow: inset 0 0 0 1.5px transparent; }
+  .sl-tile--done { box-shadow: inset 0 0 0 1.5px var(--a-ok); }
+  .sl-tile--skipped { opacity: .7; }
+  .sl-tile--partial { box-shadow: inset 0 0 0 1.5px var(--a-warn); }
+  .sl-tile__name { font-size: var(--a-text-xs); font-weight: 600; line-height: 1.2; min-height: 2.4em; }
+  .sl-tile__st { font-size: 11px; color: var(--a-ink-2); }
+  .sl-rowname { display: flex; align-items: center; gap: 8px; }
+  /* set up */
+  .sl-qrow { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: .5px solid var(--a-sep); }
+  .sl-qrow:first-child { border-top: 0; }
+  .sl-qrow__line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sl-qrow__line > .e-input, .sl-qrow__line > .e-select { flex: 1 1 10rem; min-width: 0; width: auto; }
+  .sl-qrow__btns { justify-content: flex-end; }
+  .sl-chk { display: inline-flex; align-items: center; gap: 6px; font-size: var(--a-text-sm); min-height: 44px; }
+  .sl-file { display: none; }
+  .sl-more summary { cursor: pointer; font-weight: 600; font-size: var(--a-text-sm); margin: 6px 0; min-height: 32px; }
+  .sl-more p { margin: 0 0 8px; }
+  .sl-mean { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .sl-comments { margin: 8px 0 0; padding-left: 18px; font-size: var(--a-text-sm); }
+  .sl-comments li { margin: 0 0 6px; white-space: pre-wrap; }
+  .sl-who { color: var(--a-ink-2); }
+  .sl-namebtn { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 4px 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+  .sl-namebtn:focus-visible { outline: 3px solid var(--a-focus); outline-offset: 2px; }
+  .sl-cnt { margin-left: auto; color: var(--a-tint); font-size: var(--a-text-xs); white-space: nowrap; }
+  .e-table tbody tr[hidden] { display: none; }
+  .sl-comments a { text-decoration: underline; }
+  .sl-code { width: 100%; min-height: 6.5em; font: 12px/1.4 ui-monospace, monospace; }
+</style>
+</head>
+<body class="a-app e-nonav">
+<header class="a-bar e-appbar">
+  <div class="a-band"><i></i><i></i><i></i><i></i></div>
+  <div class="a-bar-row">
+    <button type="button" id="back" class="a-bar-btn e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span aria-hidden="true">Back</span></button>
+    <div class="e-appbar__titles">
+      <h1 id="title" class="a-bar-title e-appbar__title">NUHS Residency Applications</h1>
+      <p id="sub" class="e-appbar__sub" hidden></p>
+    </div>
+    <div id="me" class="e-appbar__right"></div>
+  </div>
+</header>
+<main id="app" class="a-main"><p class="e-loading">Loading…</p></main>
+<div id="toast" class="a-toast" role="status" aria-live="polite"></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

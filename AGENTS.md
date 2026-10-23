@@ -1,9 +1,10 @@
-# <repo name>
+# residencyapps
 
 Instructions for every AI assistant working here (Claude Code reads this through `CLAUDE.md`).
-Replace the placeholders in angle brackets, then delete this line.
 
-<One or two lines: what this repo is and who uses it.>
+NUHS Residency Applications (`applicants/`, live at residencyapps.anawj.com once set up): confidential feedback on
+residency applicants from residents, faculty and others, read by the selection committee. Own Firebase project
+`residencyapps`, own Worker `residencyapps`. **Vital app**: real feedback on real people; full tests before every merge.
 
 ## Public here, private elsewhere
 
@@ -13,12 +14,21 @@ repo; never copy anything from there into this repo, a PR or an issue (neutral p
 
 ## Rules that bite
 
-- <Rule the next session must not get wrong.>
+- **No real names here, ever.** Applicants are real people and the feedback is confidential. Code and tests hold made-up
+  demo data only; the real round lives in Firestore and in the owner's private notes.
+- **Passcodes only for everyone but admins** (guest, set-up, committee; `worker/guest.js`). Admins are Google sign-ins
+  listed by hand in `admins/` in the Firebase console. No passcode or secret goes in this repo.
+- **Rules are vital:** every change to `firestore.rules` gets a case in `test/rules.emulator.mjs` and a green
+  `bash tools/test-rules.sh` before merge. The collection names (`selection*`) stay as they are (copied data).
+- Details and lessons: `NOTES.md`.
 
 ## Checks before merging
 
 ```
 node tools/check.mjs        # repo checks + Worker tests
+node test/model.test.mjs    # the app's logic
+node test/e2e.mjs           # phone-size browser test of the demo, with axe (AXE_PATH)
+bash tools/test-rules.sh    # Firestore rules in the emulator (needs Java)
 node tools/proofread.mjs    # page and doc mistakes
 ```
 
