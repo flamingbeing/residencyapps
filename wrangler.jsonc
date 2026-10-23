@@ -22,7 +22,6 @@
   // the passcode sign-in (worker/guest.js): at most 10 tries a minute per address
   "ratelimits": [{ "name": "GUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
   // the passcodes changed on the app's Set up page are read from Firestore (worker/guest.js). Both values are public (the web
-  // API key is restricted by address; access is by the rules). FIREBASE_API_KEY is filled in when the Firebase project exists:
-  // until then the Worker uses its passcode secrets only.
-  "vars": { "FIREBASE_API_KEY": "", "FIREBASE_PROJECT": "residencyapps" }
+  // API key is restricted by address; access is by the rules).
+  "vars": { "FIREBASE_API_KEY": "AIzaSyApqDdms0Ukf9rn_C97PKZSO3Wf8VmVROs", "FIREBASE_PROJECT": "residencyapps" }
 }
