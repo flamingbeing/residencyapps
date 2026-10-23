@@ -39,6 +39,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Cache rules test tools and emulator
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/anawj-rules
+            ~/.cache/firebase/emulators
+          key: rules-${{ runner.os }}-${{ hashFiles('tools/test-rules.sh') }}
       - name: Firestore rules (local emulator, demo project)
         run: bash tools/test-rules.sh
 
@@ -50,10 +57,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-1.56.1-${{ runner.os }}-ubuntu24
       - name: Install a browser and axe
         run: |
           npm install -g playwright@1.56.1 axe-core@4
-          playwright install --with-deps chromium
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            playwright install-deps chromium
+          else
+            playwright install --with-deps chromium
+          fi
       - name: Test
         run: |
           export PLAYWRIGHT_PATH="$(npm root -g)/playwright/index.mjs" AXE_PATH="$(npm root -g)/axe-core/axe.min.js"
