@@ -66,11 +66,7 @@ jobs:
       - name: Install a browser and axe
         run: |
           npm install -g playwright@1.56.1 axe-core@4
-          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
-            playwright install-deps chromium
-          else
-            playwright install --with-deps chromium
-          fi
+          playwright install chromium
       - name: Test
         run: |
           export PLAYWRIGHT_PATH="$(npm root -g)/playwright/index.mjs" AXE_PATH="$(npm root -g)/axe-core/axe.min.js"
