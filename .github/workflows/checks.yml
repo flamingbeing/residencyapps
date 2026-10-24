@@ -17,13 +17,11 @@ concurrency:
 
 jobs:
   unit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - uses: flamingbeing/app-devkit/setup-node@v1.1.0
       - name: Repo check (and Worker tests)
         run: node tools/check.mjs
       - name: Model tests
@@ -32,13 +30,11 @@ jobs:
         run: node tools/proofread.mjs
 
   rules:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - uses: flamingbeing/app-devkit/setup-node@v1.1.0
       - name: Cache rules test tools and emulator
         uses: actions/cache@v4
         with:
@@ -54,19 +50,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: flamingbeing/app-devkit/setup-node@v1.1.0
+      - name: Install Playwright and axe
+        run: npm install -g playwright@1.56.1 axe-core@4
+      - uses: flamingbeing/app-devkit/setup-browser@v1.1.0
         with:
-          node-version: 22
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: pw-1.56.1-${{ runner.os }}-ubuntu24
-      - name: Install a browser and axe
-        run: |
-          npm install -g playwright@1.56.1 axe-core@4
-          playwright install chromium
+          playwright-version: '1.56.1'
+          devkit-dir: ''
       - name: Test
         run: |
           export PLAYWRIGHT_PATH="$(npm root -g)/playwright/index.mjs" AXE_PATH="$(npm root -g)/axe-core/axe.min.js"
