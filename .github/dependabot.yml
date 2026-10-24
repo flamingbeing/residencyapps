@@ -1,0 +1,12 @@
+# Weekly bump PRs for the app-devkit CI blocks and workflows only (pinned to an exact v1.x.y).
+# Merge a bump only after this repo's own Checks pass on it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: "flamingbeing/app-devkit*"
+    commit-message:
+      prefix: "CI"
