@@ -48,9 +48,9 @@ function fakeFirestore() {
 
 // a stand-in for sync.js's saving: counts the writes sent straight to the SDK (track) and the server's answer (heard)
 function fakeSaving() {
-  const s = { tracked: 0, settled: 0, heard: 0, sent: [] };
-  s.track = p => { s.tracked++; Promise.resolve(p).finally(() => s.settled++); return p; };
-  s.heard = () => { s.heard++; };
+  const s = { tracked: 0, settled: 0, heardN: 0, sent: [] };
+  s.track = p => { s.tracked++; Promise.resolve(p).catch(() => {}).finally(() => s.settled++); return p; };
+  s.heard = () => { s.heardN++; };
   s.send = async (cycle, record) => { s.sent.push([cycle, record]); return { state: 'sent' }; };
   return s;
 }
@@ -78,11 +78,11 @@ test('the round: listed newest first, the server answering marks heard, a cached
   const list = await store.listRounds();
   assert.deepEqual(list.map(r => [r.cycle, r.status, r.shared, r.opensAt]), [['2026', 'open', true, 5], ['2025', 'closed', true, null]]);
   await new Promise(r => setTimeout(r, 0));
-  assert.equal(saving.heard, 1);
+  assert.equal(saving.heardN, 1);
   server.fromCache = true;
   assert.equal((await store.openRound()).cycle, '2026');
   await new Promise(r => setTimeout(r, 0));
-  assert.equal(saving.heard, 1);
+  assert.equal(saving.heardN, 1);
 });
 
 test('saveRound: the whole round set at selection/{cycle}, tracked, back as a round', async () => {

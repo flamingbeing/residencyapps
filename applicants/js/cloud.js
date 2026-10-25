@@ -61,22 +61,55 @@ function queued(p) {
   void track(p);
   return Promise.race([p, new Promise(r => setTimeout(r, ACK_WAIT))]);
 }
-export async function firestore() {
-  const { db, F } = await sdk();
-  return { db, F, queued, track };
-}
+// The shared store's reads and writes (store.js), so no other file calls the SDK. A path is its segments
+// (['selection', cycle, 'photos']). Errors are the SDK's own (e.g. code 'permission-denied'), passed on unchanged.
+//   list(path) -> { fromCache, docs: [{ id, data }] }; get(path) -> the data, or null when there is none
+//   set(path, data) / remove(path): queued (back after the server's answer or ACK_WAIT, whichever is first)
+//   setNow(path, data) / removeNow(path): tracked, back once the server has it
+//   removeAll(path) -> how many: every document of a collection, in batches (at most 500 writes; 400 each), tracked
+let testHook = null;
+const data = () => testHook ? testHook.sdk() : sdk();
+export const docs = {
+  async list(path) {
+    const { db, F } = await data();
+    const snap = await F.getDocs(F.collection(db, ...path));
+    return { fromCache: !!snap.metadata?.fromCache, docs: snap.docs.map(d => ({ id: d.id, data: d.data() })) };
+  },
+  async get(path) {
+    const { db, F } = await data();
+    const s = await F.getDoc(F.doc(db, ...path));
+    return s.exists() ? s.data() : null;
+  },
+  async set(path, doc) { const { db, F } = await data(); await queued(F.setDoc(F.doc(db, ...path), doc)); },
+  async remove(path) { const { db, F } = await data(); await queued(F.deleteDoc(F.doc(db, ...path))); },
+  async setNow(path, doc) { const { db, F } = await data(); await track(F.setDoc(F.doc(db, ...path), doc)); },
+  async removeNow(path) { const { db, F } = await data(); await track(F.deleteDoc(F.doc(db, ...path))); },
+  async removeAll(path) {
+    const { db, F } = await data();
+    const all = (await F.getDocs(F.collection(db, ...path))).docs;
+    for (let i = 0; i < all.length; i += 400) {
+      const b = F.writeBatch(db);
+      all.slice(i, i + 400).forEach(x => b.delete(x.ref));
+      await track(b.commit());
+    }
+    return all.length;
+  },
+};
+// tests only (test/store.test.mjs): { sdk: async () => ({ db, F }), saving } in place of Firebase and sync.js; null undoes it
+export function useFirestore(hook) { testHook = hook; }
 
 // ---- answers through app-sync's outbox (sync.js); not in the demo ----
 
 let saving = null;
 export function sending() {
+  if (testHook) return Promise.resolve(testHook.saving);
   if (demo || !enabled) return Promise.resolve(null);
   saving ||= (async () => createSaving({ AS: await import(SYNC), sdk: async () => { const s = await sdk(); return { F: s.F, db: s.db }; } }))();
   saving.catch(() => { saving = null; });   // e.g. offline on first ever load: try again next time
   return saving;
 }
 // a write sent straight to the SDK, counted until it settles (none in the demo)
-function track(p) { sending().then(s => s?.track(p), () => {}); return p; }
+function track(p) { sending().then(s => { s?.track(p); }, () => {}); return p; }   // the caller handles p's error
 
 // ---- sign-in ----
 
@@ -147,8 +180,7 @@ export async function signOut({ force = false } = {}) {
 export async function getRoles(user) {
   if (!user || user.guest) return { admin: false, committee: false };
   if (demo) return { admin: true, committee: false };
-  const { db, F } = await sdk();
-  const has = async (col) => { try { return (await F.getDoc(F.doc(db, col, lc(user.email)))).exists(); } catch { return false; } };
+  const has = async (col) => { try { return (await docs.get([col, lc(user.email)])) !== null; } catch { return false; } };
   const [admin, committee] = await Promise.all([has('admins'), has('selectionCommittee')]);
   return { admin, committee };
 }

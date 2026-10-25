@@ -2,8 +2,8 @@
 // outbox on this device first (IndexedDB), then to the server in a transaction, so an answer sent with no signal survives
 // a reload and goes by itself once the device is back online, and a refused one (the round closed) is reported, never lost
 // silently. The SDK's own offline queue is never used for answers. The other writes (the round, photos, the committee,
-// passcodes, the retention delete) still go straight to the SDK: they are counted here (track), so the status and the
-// sign-out check know they are not on the server yet.
+// passcodes, the retention delete) still go straight to the SDK (cloud.js docs): they are counted here (track), so the
+// status and the sign-out check know they are not on the server yet.
 // Pure wiring: the engine (AS), the Firestore handle and the browser bits are passed in, so test/sync.test.mjs runs it in Node.
 //
 // createSaving({ AS, sdk, store, online, persist }) -> { activate, send, track, status, canReload, signOut, onChange, queue }
