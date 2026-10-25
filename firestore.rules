@@ -24,22 +24,33 @@ service cloud.firestore {
     function selCommittee() {
       return signedIn() && exists(/databases/$(database)/documents/selectionCommittee/$(me()));
     }
+    // Passcode tokens come in two shapes: app-devkit's (worker/custom-token.js, since 25 Oct 2026: m passcode, g { _: role })
+    // and the older one (guest, role) that tokens issued before keep. role(): the passcode role, '' when none.
+    function kitRole() {
+      return request.auth.token.get('g', {}).get('_', '');
+    }
     function isPasscode() {
-      return request.auth != null && request.auth.token.guest == true && !('email' in request.auth.token);
+      return request.auth != null && !('email' in request.auth.token)
+        && (request.auth.token.get('guest', false) == true
+          || (request.auth.token.get('m', '') == 'passcode' && kitRole() in ['guest', 'setup', 'committee']));
+    }
+    function passRole() {
+      return request.auth.token.get('m', '') == 'passcode' ? kitRole() : request.auth.token.get('role', 'guest');
     }
     // tokens issued before roles existed have no role claim: guests
     function isGuest() {
-      return isPasscode() && (!('role' in request.auth.token) || request.auth.token.role == 'guest');
+      return isPasscode() && passRole() == 'guest';
     }
     function isSetupCode() {
-      return isPasscode() && request.auth.token.get('role', '') == 'setup';
+      return isPasscode() && passRole() == 'setup';
     }
     function isCommitteeCode() {
-      return isPasscode() && request.auth.token.get('role', '') == 'committee';
+      return isPasscode() && passRole() == 'committee';
     }
-    // the Worker's service sign-in that reads the passcodes (claim codesReader, no email)
+    // the Worker's service sign-in that reads the passcodes (claim codesReader, or the kit's g { _: codesReader }; no email)
     function isCodesReader() {
-      return request.auth != null && request.auth.token.get('codesReader', false) == true && !('email' in request.auth.token);
+      return request.auth != null && !('email' in request.auth.token) && request.auth.token.get('m', '') == ''
+        && (request.auth.token.get('codesReader', false) == true || kitRole() == 'codesReader');
     }
     function selStaff() {
       return isAdmin() || isSetupCode();

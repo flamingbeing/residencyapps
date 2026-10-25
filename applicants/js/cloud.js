@@ -1,6 +1,6 @@
 // Sign-in and the Firestore handle (Firebase project residencyapps; who may do what is in firestore.rules).
 // Everyone who answers, sets up or reads the results signs in with a passcode: the Worker (worker/guest.js) checks it and hands
-// back a custom token (claim guest, role guest|setup|committee, no email). Admins sign in with Google; an admin is an email in
+// back a custom token (role guest|setup|committee as claim role, or app-devkit's m passcode, g { _: role }; no email). Admins sign in with Google; an admin is an email in
 // admins/{email}, and a committee member one in selectionCommittee/{email} (both checked here, enforced by the rules).
 // With ?demo nothing loads from Firebase: a made-up sign-in per role (?demo=guest|setup|committee|admin), and store.js keeps
 // the data in this browser.
@@ -9,7 +9,7 @@ import { FIREBASE_CONFIG } from './firebase-config.js';
 import { createSaving } from './sync.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-const SYNC = 'https://core.anawj.com/sync/0.4.1/index.js';   // app-sync, one exact version (also in sw.js SHELL)
+const SYNC = 'https://core.anawj.com/sync/0.6.0/index.js';   // app-sync, one exact version (also in sw.js SHELL)
 const params = (() => { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } })();
 export const demo = params.has('demo');
 export const enabled = demo || !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
@@ -104,7 +104,7 @@ let saving = null;
 export function sending() {
   if (testHook) return Promise.resolve(testHook.saving);
   if (demo || !enabled) return Promise.resolve(null);
-  saving ||= (async () => createSaving({ AS: await import(SYNC), sdk: async () => { const s = await sdk(); return { F: s.F, db: s.db }; } }))();
+  saving ||= (async () => createSaving({ AS: await import(SYNC), sdk: async () => { const s = await sdk(); return { A: s.A, F: s.F, auth: s.auth, get db() { return s.db; } }; } }))();
   saving.catch(() => { saving = null; });   // e.g. offline on first ever load: try again next time
   return saving;
 }
@@ -118,7 +118,8 @@ async function asUser(u) {
   if (!u) return null;
   if (u.email) return { email: lc(u.email), name: u.displayName || u.email, uid: u.uid };
   let role = 'guest';
-  try { const r = (await u.getIdTokenResult()).claims.role; if (r === 'setup' || r === 'committee') role = r; } catch {}
+  // the role claim (older tokens) or app-devkit's g { _: role } (worker/custom-token.js)
+  try { const c = (await u.getIdTokenResult()).claims, r = c.m === 'passcode' ? c.g?._ : c.role; if (r === 'setup' || r === 'committee') role = r; } catch {}
   return { email: 'guest-' + u.uid, name: 'Guest', uid: u.uid, guest: true, role };
 }
 

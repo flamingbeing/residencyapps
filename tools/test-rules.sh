@@ -15,7 +15,7 @@ if [ ! -e node_modules ]; then ln -s "$TOOLS/node_modules" node_modules; made_li
 cfg="$(mktemp -d)/firebase.json"
 echo '{ "firestore": { "rules": "firestore.rules" }, "emulators": { "firestore": { "port": 8085, "host": "127.0.0.1" }, "ui": { "enabled": false } } }' > "$cfg"
 "$TOOLS/node_modules/.bin/firebase" emulators:exec --config "$cfg" --only firestore --project demo-residencyapps \
-  "node test/rules.emulator.mjs" 2>&1 | grep -E 'checks passed|checks failed|^FAIL|^Error:' ; rc=${PIPESTATUS[0]}
+  "node test/rules.emulator.mjs && CLAIMS=kit node test/rules.emulator.mjs" 2>&1 | grep -E 'checks passed|checks failed|^FAIL|^Error:' ; rc=${PIPESTATUS[0]}
 [ $made_link = 1 ] && rm -f node_modules
 rm -f firebase-debug.log firestore-debug.log
 exit $rc

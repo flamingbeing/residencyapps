@@ -4,47 +4,50 @@
 // silently. The SDK's own offline queue is never used for answers. The other writes (the round, photos, the committee,
 // passcodes, the retention delete) still go straight to the SDK (cloud.js docs): they are counted here (track), so the
 // status and the sign-out check know they are not on the server yet.
-// Pure wiring: the engine (AS), the Firestore handle and the browser bits are passed in, so test/sync.test.mjs runs it in Node.
+// The wiring is app-sync's createApp (0.6.0): its write queue, outbox and Firestore adapter; nothing is watched (the
+// screens read through cloud.js docs), and sign-out runs forgetDevice on createApp's parts (force skips the unsent check).
+// The engine (AS), the Firebase SDK and the browser bits are passed in, so test/sync.test.mjs runs it in Node.
 //
-// createSaving({ AS, sdk, store, online, persist }) -> { activate, send, track, status, canReload, signOut, onChange, queue }
-//   AS: app-sync's index.js. sdk: async () -> { F, db }. store: the outbox (default AS.createOutbox). online: () -> bool.
-//   persist: async () -> { persisted, supported } (default AS.persistGuard).
+// createSaving({ AS, sdk, store, online, persist, storage }) -> { activate, send, track, status, canReload, signOut, onChange, queue, app }
+//   AS: app-sync's index.js. sdk: async () -> { A, F, auth, db }. store: the outbox (default residencyapps-outbox).
+//   online: () -> bool. persist: async () -> { persisted, supported } (default AS.persistGuard). storage: createApp's.
 
 // selection/{cycle}/responses/{id}: the kind carries the round, so one outbox holds every round's answers
 export const KIND = cycle => 'responses@' + cycle;
 const cycleOf = kind => String(kind).replace(/^responses@/, '');
 const replace = (_current, record) => record;
 
-export function createSaving({ AS, sdk, store = null, online = () => globalThis.navigator?.onLine !== false, persist = () => AS.persistGuard() }) {
-  const fs = AS.createFirestoreBackend({
-    sdk, path: (_owner, kind) => ['selection', cycleOf(kind), 'responses'],
-    // the whole response replaces what is there, as setDoc did (one per person, only they write it); updatedAt is this
-    // device's time, serverAt the server's (stampMode 'server': the rules require serverAt == request.time)
-    merge: new Proxy({}, { getOwnPropertyDescriptor: () => ({ value: replace, writable: true, enumerable: true, configurable: true }), get: () => replace }),
-    stamp: doc => ({ ...doc, updatedAt: Date.now() }), stampMode: 'server',
-    onSnapshotMeta: () => {},
-  });
-  let owner = null;
+export function createSaving({ AS, sdk, store = null, online = () => globalThis.navigator?.onLine !== false, persist = () => AS.persistGuard(), storage }) {
   const others = new Set();   // writes sent straight to the SDK, not yet on the server
   const listeners = new Set();
   const notify = () => { for (const fn of listeners) { try { fn(); } catch (e) { console.warn(e); } } };
-  const queue = AS.createWriteQueue({
-    store: store || AS.createOutbox({ name: 'residencyapps-outbox' }), getOwner: () => owner, online,
-    backend: (_owner, kind, record, base, extra) => fs.commit(owner, kind, record, base, extra),
-    otherPending: async () => others.size > 0,
+  const nav = { get onLine() { return online(); }, get userAgent() { return globalThis.navigator?.userAgent || ''; } };
+  // a kind is responses@<cycle>; createApp hands it to the adapter as the collection, so path finds the round
+  const app = AS.createApp({
+    name: 'residencyapps', colls: ['responses'], path: (_owner, kind) => ['selection', cycleOf(kind), 'responses'], sdk, nav,
+    ...(store ? { outbox: store } : {}), ...(storage !== undefined ? { storage } : {}), watchEvery: 0,
+    // the whole response replaces what is there, as setDoc did (one per person, only they write it); updatedAt is this
+    // device's time, serverAt the server's (stampMode 'server': the rules require serverAt == request.time)
+    backend: {
+      merge: new Proxy({}, { getOwnPropertyDescriptor: () => ({ value: replace, writable: true, enumerable: true, configurable: true }), get: () => replace }),
+      stamp: doc => ({ ...doc, updatedAt: Date.now() }), stampMode: 'server',
+    },
+    queue: { otherPending: async () => others.size > 0 },
   });
+  const { queue } = app;
+  let owner = null;
   queue.onChange(notify);
-  globalThis.addEventListener?.('online', () => { queue.kick(); notify(); });
+  globalThis.addEventListener?.('online', notify);
   globalThis.addEventListener?.('offline', notify);
   let persisted = true, confirmed = false, sending = 0;
 
   return {
-    queue,
+    queue, app,
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     // at sign-in: this person's unsent answers (from before a reload) start going again
     async activate(id) {
       owner = id;
-      await queue.activate(id);
+      await app.open(id);
       persist().then(r => { persisted = !!r.persisted || !r.supported; notify(); }, () => {});
     },
     // the server answered (a read not from the cache): the status may say synced from now on
@@ -55,7 +58,7 @@ export function createSaving({ AS, sdk, store = null, online = () => globalThis.
       const kind = KIND(cycle);
       sending++; notify();
       try {
-        await queue.save(kind, owner, record, null);
+        await app.save(kind, owner, record, null);
         await queue.settle(kind, [record.id], ms);
         const job = queue.entries().find(x => x.kind === kind && x.record.id === record.id && x.state !== 'archived');
         if (!job || job.state === 'synced') return { state: 'sent' };
@@ -89,8 +92,10 @@ export function createSaving({ AS, sdk, store = null, online = () => globalThis.
     async signOut({ force = false, before = async () => {} } = {}) {
       if (!force && !(await queue.flush())) return { ok: false, unsent: true };
       await before();
-      const r = await AS.forgetDevice({ queue, clearBackendCache: () => fs.clearCache() });
+      const { hub, stores, adapter } = app.parts;
+      const r = await AS.forgetDevice({ hub, stores, queue, clearBackendCache: () => adapter.clearCache() });
       owner = null;
+      await app.open('');
       if (r.failed.length) console.warn('Sign-out: could not clear', r.failed.join(', '));
       return { ok: true };
     },
