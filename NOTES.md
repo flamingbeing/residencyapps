@@ -49,8 +49,13 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
 - **Answers go through app-sync's outbox** (`applicants/js/sync.js`, app-sync 0.4.1 at `core.anawj.com/sync/0.4.1/`): kept
   on the device first, then sent in a transaction with `updatedAt` (device ms) and `serverAt` (server time, the rules check
   it). With no signal "Send" says "Saved" and the answer goes by itself later; a refusal (round closed) is shown and set
-  aside. The other writes (round, photos, committee, passcodes, retention) still go straight to the SDK but are counted
-  (`track`), so the status chip and the sign-out check see them.
+  aside. The other writes (round, photos, committee, passcodes, retention) go to the SDK through `cloud.docs` and are
+  counted (`track`), so the status chip and the sign-out check see them.
+- **Only `cloud.js` calls the Firebase SDK** (and `firebase-config.js` holds the config): `store.js` reads and writes
+  through `cloud.docs` (`list`, `get`, `set`/`remove` queued, `setNow`/`removeNow`/`removeAll` tracked).
+  `test/store.test.mjs` checks this and every store path against a made-up Firestore. The round, committee, passcode and
+  photo writes stay off app-sync's outbox on purpose for now: its adapter stamps `id`/`serverAt` (and `updatedAt`), which
+  those rules' field lists refuse, so moving them is a rules change of its own.
 - **Signing out wipes the offline copy** (shared ward PCs): app-sync `forgetDevice` (the outbox and the SDK's cache). It is
   refused while anything is unsent; the person may still sign out and lose it.
 - **Status chip** (live only, beside the account button): Connecting… until the server has answered once, then Synced,
@@ -62,7 +67,7 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
 ## How to test
 
 - `node test/model.test.mjs`: the logic. `node --test test/sync.test.mjs`: sending through the outbox (the real app-sync
-  against a made-up Firestore) and the version pins. `node test/e2e.mjs`: every role in the demo at phone size, with axe
+  against a made-up Firestore) and the version pins. `node --test test/store.test.mjs`: every store read and write. `node test/e2e.mjs`: every role in the demo at phone size, with axe
   (`AXE_PATH=<axe.min.js>`). `bash tools/test-rules.sh`: the rules in the emulator (Java). `node tools/check.mjs`: repo
   checks and Worker tests. All run in Checks on every PR.
 - Demo: `?demo` (`=guest`, `=setup`, `=committee`, `=admin`; `=reset` starts over); the account sheet switches role.

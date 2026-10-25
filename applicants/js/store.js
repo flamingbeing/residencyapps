@@ -59,10 +59,9 @@ const byNewest = (a, b) => b.updatedAt - a.updatedAt;
 // every round (staff and the committee pick one to look at)
 export async function listRounds() {
   if (cloud.demo) return Object.entries(demoDb().rounds).map(([id, d]) => toRound(id, d)).filter(Boolean).sort(byNewest);
-  const { db, F } = await cloud.firestore();
-  const snap = await F.getDocs(F.collection(db, 'selection'));
-  if (!snap.metadata?.fromCache) cloud.sending().then(s => s?.heard(), () => {});   // the server answered: the status may say synced
-  return snap.docs.map(d => toRound(d.id, d.data())).filter(Boolean).sort(byNewest);
+  const snap = await cloud.docs.list(['selection']);
+  if (!snap.fromCache) cloud.sending().then(s => s?.heard(), () => {});   // the server answered: the status may say synced
+  return snap.docs.map(d => toRound(d.id, d.data)).filter(Boolean).sort(byNewest);
 }
 export const openRound = async () => (await listRounds()).find(r => r.status === 'open') || null;
 
@@ -73,8 +72,7 @@ export async function saveRound(round, status = 'open') {
   // open and close dates (ms): the rules refuse answers outside them, so no scheduled job is needed
   for (const k of ['opensAt', 'closesAt']) if (when(round[k]) != null) doc[k] = when(round[k]);
   if (cloud.demo) { const d = demoDb(); d.rounds[cycle] = doc; demoWrite(d); return toRound(cycle, doc); }
-  const { db, F, queued } = await cloud.firestore();
-  await queued(F.setDoc(F.doc(db, 'selection', cycle), doc));
+  await cloud.docs.set(['selection', cycle], doc);
   return toRound(cycle, doc);
 }
 
@@ -86,22 +84,19 @@ export async function listPhotos(cycle) {
     for (const k of Object.keys(p)) if (k.startsWith(cycle + '|')) out[k.slice(cycle.length + 1)] = p[k];
     return out;
   }
-  const { db, F } = await cloud.firestore();
   const out = {};
-  try { for (const d of (await F.getDocs(F.collection(db, 'selection', cycle, 'photos'))).docs) { const src = photoSrc(d.data().jpeg); if (src) out[d.id] = src; } }
+  try { for (const d of (await cloud.docs.list(['selection', cycle, 'photos'])).docs) { const src = photoSrc(d.data.jpeg); if (src) out[d.id] = src; } }
   catch (e) { if (e?.code !== 'permission-denied') throw e; }
   return out;
 }
 // jpeg: base64 JPEG (photo.js makes it)
 export async function savePhoto(cycle, applicantId, jpeg) {
   if (cloud.demo) { const d = demoDb(); d.photos[cycle + '|' + applicantId] = photoSrc(jpeg); demoWrite(d); return; }
-  const { db, F, track } = await cloud.firestore();
-  await track(F.setDoc(F.doc(db, 'selection', cycle, 'photos', applicantId), { jpeg, updatedAt: Date.now() }));
+  await cloud.docs.setNow(['selection', cycle, 'photos', applicantId], { jpeg, updatedAt: Date.now() });
 }
 export async function removePhoto(cycle, applicantId) {
   if (cloud.demo) { const d = demoDb(); delete d.photos[cycle + '|' + applicantId]; demoWrite(d); return; }
-  const { db, F, track } = await cloud.firestore();
-  await track(F.deleteDoc(F.doc(db, 'selection', cycle, 'photos', applicantId)));
+  await cloud.docs.removeNow(['selection', cycle, 'photos', applicantId]);
 }
 
 // ---- responses ----
@@ -110,8 +105,7 @@ export async function removePhoto(cycle, applicantId) {
 export async function myResponse(cycle, email) {
   email = lc(email);
   if (cloud.demo) return demoDb().responses[cycle + '|' + email] || null;
-  const { db, F } = await cloud.firestore();
-  try { const s = await F.getDoc(F.doc(db, 'selection', cycle, 'responses', email)); if (!s.exists()) return null; const { id: _id, serverAt: _s, ...v } = s.data(); return v; }
+  try { const d = await cloud.docs.get(['selection', cycle, 'responses', email]); if (!d) return null; const { id: _id, serverAt: _s, ...v } = d; return v; }
   catch (e) { if (e?.code === 'permission-denied') return null; throw e; }
 }
 // -> 'sent' (the server has it) or 'waiting' (kept in this device's outbox: it goes by itself once back online); throws
@@ -127,9 +121,8 @@ export async function sendResponse(round, user, name, answers) {
 // admins and the committee: every response to a round
 export async function listResponses(cycle) {
   if (cloud.demo) return Object.entries(demoDb().responses).filter(([k]) => k.startsWith(cycle + '|')).map(([, v]) => v);
-  const { db, F } = await cloud.firestore();
-  return (await F.getDocs(F.collection(db, 'selection', cycle, 'responses'))).docs.map(d => {
-    const v = d.data(); const t = v.updatedAt;
+  return (await cloud.docs.list(['selection', cycle, 'responses'])).docs.map(d => {
+    const v = d.data; const t = v.updatedAt;
     const { id: _id, serverAt: _s, ...rest } = v;
     return { ...rest, updatedAt: t?.toMillis ? t.toMillis() : Number(t) || 0 };
   });
@@ -144,26 +137,15 @@ export async function deleteRoundData(cycle) {
     for (const k of Object.keys(d.photos)) if (k.startsWith(cycle + '|')) { delete d.photos[k]; out.photos++; }
     demoWrite(d); return out;
   }
-  const { db, F, track } = await cloud.firestore();
   const out = {};
-  for (const sub of ['responses', 'photos']) {
-    const docs = (await F.getDocs(F.collection(db, 'selection', cycle, sub))).docs;
-    // a batch holds at most 500 writes
-    for (let i = 0; i < docs.length; i += 400) {
-      const b = F.writeBatch(db);
-      docs.slice(i, i + 400).forEach(x => b.delete(x.ref));
-      await track(b.commit());
-    }
-    out[sub] = docs.length;
-  }
+  for (const sub of ['responses', 'photos']) out[sub] = await cloud.docs.removeAll(['selection', cycle, sub]);
   return out;
 }
 
 // the committee list (admins keep it; a member can check their own entry)
 export async function listCommittee() {
   if (cloud.demo) return Object.entries(demoDb().committee).map(([email, v]) => ({ email, name: v.name || '' }));
-  const { db, F } = await cloud.firestore();
-  return (await F.getDocs(F.collection(db, 'selectionCommittee'))).docs.map(d => ({ email: d.id, name: d.data().name || '' }))
+  return (await cloud.docs.list(['selectionCommittee'])).docs.map(d => ({ email: d.id, name: d.data.name || '' }))
     .sort((a, b) => a.email.localeCompare(b.email));
 }
 export async function saveCommittee({ email, name }) {
@@ -171,28 +153,24 @@ export async function saveCommittee({ email, name }) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('That doesn’t look like an email address.');
   const doc = { name: String(name || '').trim().slice(0, 200) };
   if (cloud.demo) { const d = demoDb(); d.committee[email] = doc; demoWrite(d); return; }
-  const { db, F, queued } = await cloud.firestore();
-  await queued(F.setDoc(F.doc(db, 'selectionCommittee', email), doc));
+  await cloud.docs.set(['selectionCommittee', email], doc);
 }
 export async function removeCommittee(email) {
   email = lc(email);
   if (cloud.demo) { const d = demoDb(); delete d.committee[email]; demoWrite(d); return; }
-  const { db, F, queued } = await cloud.firestore();
-  await queued(F.deleteDoc(F.doc(db, 'selectionCommittee', email)));
+  await cloud.docs.remove(['selectionCommittee', email]);
 }
 
 // the three sign-in passcodes the Worker accepts, set on the Set up page (admins); a role with none here uses the Worker's own secret
 export async function listCodes() {
   if (cloud.demo) return { ...demoDb().codes };
-  const { db, F } = await cloud.firestore();
   const out = {};
-  for (const d of (await F.getDocs(F.collection(db, 'selectionCodes'))).docs) if (typeof d.data().code === 'string') out[d.id] = d.data().code;
+  for (const d of (await cloud.docs.list(['selectionCodes'])).docs) if (typeof d.data.code === 'string') out[d.id] = d.data.code;
   return out;
 }
 export async function saveCode(role, code) {
   code = String(code || '').trim();
   if (!['guest', 'setup', 'committee'].includes(role)) throw new Error('Unknown passcode.');
   if (cloud.demo) { const d = demoDb(); d.codes[role] = code; demoWrite(d); return; }
-  const { db, F, queued } = await cloud.firestore();
-  await queued(F.setDoc(F.doc(db, 'selectionCodes', role), { code, updatedAt: Date.now() }));
+  await cloud.docs.set(['selectionCodes', role], { code, updatedAt: Date.now() });
 }
