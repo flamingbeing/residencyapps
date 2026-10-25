@@ -126,12 +126,16 @@ service cloud.firestore {
         && d.jpeg is string && d.jpeg.size() > 0 && d.jpeg.size() <= 80000
         && optNumber(d, 'updatedAt');
     }
+    // Sent through app-sync's outbox (applicants/js/sync.js): id, updatedAt the device's time (ms) and serverAt the
+    // server's. The app before it sent updatedAt as the server's time and no serverAt; both are the server's word on when.
     function validSelResponse(rid, d) {
-      return d.keys().hasOnly(['email', 'name', 'answers', 'updatedAt'])
+      return d.keys().hasOnly(['email', 'name', 'answers', 'updatedAt', 'id', 'serverAt'])
         && d.email == rid
+        && (!('id' in d) || d.id == rid)
         && d.name is string && d.name.size() > 0 && d.name.size() <= 120
         && d.answers is map && d.answers.size() <= 200
-        && d.updatedAt == request.time;
+        && (('serverAt' in d && d.serverAt == request.time && d.updatedAt is number)
+          || (!('serverAt' in d) && d.updatedAt == request.time));
     }
   }
 }

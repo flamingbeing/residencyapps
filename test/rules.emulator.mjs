@@ -1,7 +1,7 @@
 // Firestore rules checks (firestore.rules) against the local emulator, fake accounts only. Run from the repo root:
 //   bash tools/test-rules.sh
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, getDocs, collection, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getDocs, collection, deleteDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import fs from 'node:fs';
 
 const env = await initializeTestEnvironment({
@@ -93,6 +93,16 @@ await t('answers inside the dates', assertSucceeds(setDoc(doc(g1, 'selection', '
 await t('updatedAt must be the server time', assertFails(setDoc(doc(g2, 'selection', 'c1', 'responses', 'guest-g2'), resp('guest-g2', { updatedAt: 5 }))));
 await t('response takes no extra fields', assertFails(setDoc(doc(g2, 'selection', 'c1', 'responses', 'guest-g2'), resp('guest-g2', { extra: 1 }))));
 await t('response needs a name', assertFails(setDoc(doc(g2, 'selection', 'c1', 'responses', 'guest-g2'), resp('guest-g2', { name: '' }))));
+// sent through app-sync's outbox (applicants/js/sync.js): id, updatedAt the device's ms, serverAt the server's time, in a transaction
+const viaSync = (id, o = {}) => ({ ...resp(id), id, updatedAt: Date.now(), serverAt: serverTimestamp(), ...o });
+const txSend = (db, cycle, id, data) => runTransaction(db, async tx => { const ref = doc(db, 'selection', cycle, 'responses', id); await tx.get(ref); tx.set(ref, data); });
+await t('guest sends through the outbox (transaction, serverAt)', assertSucceeds(txSend(g2, 'c1', 'guest-g2', viaSync('guest-g2'))));
+await t('guest sends again through the outbox', assertSucceeds(txSend(g2, 'c1', 'guest-g2', viaSync('guest-g2', { name: 'Dr Two' }))));
+await t('the old shape still works beside it', assertSucceeds(setDoc(doc(g2, 'selection', 'c1', 'responses', 'guest-g2'), resp('guest-g2'))));
+await t('serverAt must be the server time', assertFails(txSend(g2, 'c1', 'guest-g2', viaSync('guest-g2', { serverAt: 5 }))));
+await t('with serverAt, updatedAt is a number', assertFails(txSend(g2, 'c1', 'guest-g2', viaSync('guest-g2', { updatedAt: 'now' }))));
+await t('the id in the body is the document’s', assertFails(txSend(g2, 'c1', 'guest-g2', viaSync('guest-g2', { id: 'guest-g1' }))));
+await t('no outbox answers to a closed round', assertFails(txSend(g2, 'old', 'guest-g2', viaSync('guest-g2'))));
 for (const [who, db, id] of [['set-up code', su, 'guest-s1'], ['committee code', cm, 'guest-c1'], ['admin', adm, 'guest-boss'], ['committee member', com, COM], ['stranger', str, STRANGER]])
   await t(`${who} cannot send a response`, assertFails(setDoc(doc(db, 'selection', 'c1', 'responses', id), resp(id))));
 await t('set-up code cannot read responses', assertFails(getDocs(collection(su, 'selection', 'c1', 'responses'))));

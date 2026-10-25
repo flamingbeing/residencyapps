@@ -60,7 +60,9 @@ const byNewest = (a, b) => b.updatedAt - a.updatedAt;
 export async function listRounds() {
   if (cloud.demo) return Object.entries(demoDb().rounds).map(([id, d]) => toRound(id, d)).filter(Boolean).sort(byNewest);
   const { db, F } = await cloud.firestore();
-  return (await F.getDocs(F.collection(db, 'selection'))).docs.map(d => toRound(d.id, d.data())).filter(Boolean).sort(byNewest);
+  const snap = await F.getDocs(F.collection(db, 'selection'));
+  if (!snap.metadata?.fromCache) cloud.sending().then(s => s?.heard(), () => {});   // the server answered: the status may say synced
+  return snap.docs.map(d => toRound(d.id, d.data())).filter(Boolean).sort(byNewest);
 }
 export const openRound = async () => (await listRounds()).find(r => r.status === 'open') || null;
 
@@ -93,13 +95,13 @@ export async function listPhotos(cycle) {
 // jpeg: base64 JPEG (photo.js makes it)
 export async function savePhoto(cycle, applicantId, jpeg) {
   if (cloud.demo) { const d = demoDb(); d.photos[cycle + '|' + applicantId] = photoSrc(jpeg); demoWrite(d); return; }
-  const { db, F } = await cloud.firestore();
-  await F.setDoc(F.doc(db, 'selection', cycle, 'photos', applicantId), { jpeg, updatedAt: Date.now() });
+  const { db, F, track } = await cloud.firestore();
+  await track(F.setDoc(F.doc(db, 'selection', cycle, 'photos', applicantId), { jpeg, updatedAt: Date.now() }));
 }
 export async function removePhoto(cycle, applicantId) {
   if (cloud.demo) { const d = demoDb(); delete d.photos[cycle + '|' + applicantId]; demoWrite(d); return; }
-  const { db, F } = await cloud.firestore();
-  await F.deleteDoc(F.doc(db, 'selection', cycle, 'photos', applicantId));
+  const { db, F, track } = await cloud.firestore();
+  await track(F.deleteDoc(F.doc(db, 'selection', cycle, 'photos', applicantId)));
 }
 
 // ---- responses ----
@@ -109,16 +111,17 @@ export async function myResponse(cycle, email) {
   email = lc(email);
   if (cloud.demo) return demoDb().responses[cycle + '|' + email] || null;
   const { db, F } = await cloud.firestore();
-  try { const s = await F.getDoc(F.doc(db, 'selection', cycle, 'responses', email)); return s.exists() ? s.data() : null; }
+  try { const s = await F.getDoc(F.doc(db, 'selection', cycle, 'responses', email)); if (!s.exists()) return null; const { id: _id, serverAt: _s, ...v } = s.data(); return v; }
   catch (e) { if (e?.code === 'permission-denied') return null; throw e; }
 }
+// -> 'sent' (the server has it) or 'waiting' (kept in this device's outbox: it goes by itself once back online); throws
+// what the server said (the round closed, no access). Through app-sync's outbox (sync.js), never the SDK's own queue.
 export async function sendResponse(round, user, name, answers) {
   const email = lc(user.email);
   const clean = cleanAnswers(round, answers);
-  if (cloud.demo) { const d = demoDb(); d.responses[round.cycle + '|' + email] = { email, name, answers: clean, updatedAt: Date.now() }; demoWrite(d); return; }
-  const { db, F } = await cloud.firestore();
-  // a plain await: "sent" must mean the server has it, not that it is queued on this phone
-  await F.setDoc(F.doc(db, 'selection', round.cycle, 'responses', email), { email, name, answers: clean, updatedAt: F.serverTimestamp() });
+  if (cloud.demo) { const d = demoDb(); d.responses[round.cycle + '|' + email] = { email, name, answers: clean, updatedAt: Date.now() }; demoWrite(d); return 'sent'; }
+  const saving = await cloud.sending();
+  return (await saving.send(round.cycle, { id: email, email, name, answers: clean })).state;
 }
 
 // admins and the committee: every response to a round
@@ -127,7 +130,8 @@ export async function listResponses(cycle) {
   const { db, F } = await cloud.firestore();
   return (await F.getDocs(F.collection(db, 'selection', cycle, 'responses'))).docs.map(d => {
     const v = d.data(); const t = v.updatedAt;
-    return { ...v, updatedAt: t?.toMillis ? t.toMillis() : Number(t) || 0 };
+    const { id: _id, serverAt: _s, ...rest } = v;
+    return { ...rest, updatedAt: t?.toMillis ? t.toMillis() : Number(t) || 0 };
   });
 }
 
@@ -140,7 +144,7 @@ export async function deleteRoundData(cycle) {
     for (const k of Object.keys(d.photos)) if (k.startsWith(cycle + '|')) { delete d.photos[k]; out.photos++; }
     demoWrite(d); return out;
   }
-  const { db, F } = await cloud.firestore();
+  const { db, F, track } = await cloud.firestore();
   const out = {};
   for (const sub of ['responses', 'photos']) {
     const docs = (await F.getDocs(F.collection(db, 'selection', cycle, sub))).docs;
@@ -148,7 +152,7 @@ export async function deleteRoundData(cycle) {
     for (let i = 0; i < docs.length; i += 400) {
       const b = F.writeBatch(db);
       docs.slice(i, i + 400).forEach(x => b.delete(x.ref));
-      await b.commit();
+      await track(b.commit());
     }
     out[sub] = docs.length;
   }

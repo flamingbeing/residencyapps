@@ -29,6 +29,8 @@ export default {
     if (res.status === 404) return notFound();
     res = new Response(res.body, res);
     res.headers.set('X-Robots-Tag', NOINDEX);
+    // the service worker is always checked with the server, so a new version is seen at once
+    if (/(^|\/)sw\.js$/.test(file)) res.headers.set('Cache-Control', 'no-cache');
     return res;
   },
 };

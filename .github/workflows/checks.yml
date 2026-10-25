@@ -26,6 +26,8 @@ jobs:
         run: node tools/check.mjs
       - name: Model tests
         run: node test/model.test.mjs
+      - name: Sending through app-sync (outbox, status, sign-out) and the version pins
+        run: node --test test/sync.test.mjs
       - name: Proof-read (pages and documents)
         run: node tools/proofread.mjs
 

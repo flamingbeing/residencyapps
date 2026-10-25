@@ -6,8 +6,10 @@
 // the data in this browser.
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
+import { createSaving } from './sync.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+const SYNC = 'https://core.anawj.com/sync/0.4.0/index.js';   // app-sync, one exact version (also in sw.js SHELL)
 const params = (() => { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } })();
 export const demo = params.has('demo');
 export const enabled = demo || !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
@@ -53,14 +55,28 @@ function openDb(a, fs) {
   catch (e) { console.warn('Offline cache unavailable; using memory only', e); return fs.getFirestore(a); }
 }
 // A write applies to the local cache at once but only settles when the server confirms: wait a little, then go on.
+// Either way it is counted as unsent until the server has it (sync.js track: the status and the sign-out check).
 function queued(p) {
   p.catch(e => console.error('Sync failed', e));
+  void track(p);
   return Promise.race([p, new Promise(r => setTimeout(r, ACK_WAIT))]);
 }
 export async function firestore() {
   const { db, F } = await sdk();
-  return { db, F, queued };
+  return { db, F, queued, track };
 }
+
+// ---- answers through app-sync's outbox (sync.js); not in the demo ----
+
+let saving = null;
+export function sending() {
+  if (demo || !enabled) return Promise.resolve(null);
+  saving ||= (async () => createSaving({ AS: await import(SYNC), sdk: async () => { const s = await sdk(); return { F: s.F, db: s.db }; } }))();
+  saving.catch(() => { saving = null; });   // e.g. offline on first ever load: try again next time
+  return saving;
+}
+// a write sent straight to the SDK, counted until it settles (none in the demo)
+function track(p) { sending().then(s => s?.track(p), () => {}); return p; }
 
 // ---- sign-in ----
 
@@ -78,7 +94,12 @@ export async function watchUser(cb) {
   if (!enabled) return;
   const { auth, A } = await sdk();
   A.getRedirectResult(auth).catch(e => console.warn('Redirect sign-in failed', e));
-  A.onAuthStateChanged(auth, async u => cb(await asUser(u)));
+  A.onAuthStateChanged(auth, async u => {
+    const user = await asUser(u);
+    // this person's answers not sent before a reload start going again
+    if (user) await sending().then(sv => sv?.activate(user.email)).catch(e => console.warn('Outbox unavailable', e));
+    cb(user);
+  });
 }
 
 // Admins: Google, popup first; redirect when popups are blocked or unsupported (some home-screen apps).
@@ -102,13 +123,22 @@ export async function signInWithPasscode(passcode) {
   await A.signInWithCustomToken(auth, b.token);
 }
 
-// Signing out also wipes this device's offline copy (a shared ward PC keeps nothing).
-export async function signOut() {
-  if (demo) { demoSignedOut = true; demoCb?.(null); return; }
+// Signing out also wipes this device's offline copy (a shared ward PC keeps nothing): the outbox and the SDK's cache
+// (app-sync forgetDevice). Refused while answers or other changes are not on the server yet, unless force.
+// -> { ok: true } or { ok: false, unsent: true }
+export async function signOut({ force = false } = {}) {
+  if (demo) { demoSignedOut = true; demoCb?.(null); return { ok: true }; }
   const s = await sdk();
-  await s.A.signOut(s.auth);
-  try { await s.F.terminate(s.db); await s.F.clearIndexedDbPersistence(s.db); } catch (e) { console.warn('Could not clear the offline cache', e); }
-  s.db = openDb(s.app, s.F);
+  const sv = await sending().catch(() => null);
+  if (!sv) {
+    await s.A.signOut(s.auth);
+    try { await s.F.terminate(s.db); await s.F.clearIndexedDbPersistence(s.db); } catch (e) { console.warn('Could not clear the offline cache', e); }
+    s.db = openDb(s.app, s.F);
+    return { ok: true };
+  }
+  const r = await sv.signOut({ force, before: () => s.A.signOut(s.auth) });
+  if (r.ok) s.db = openDb(s.app, s.F);
+  return r;
 }
 
 // ---- roles of a Google sign-in ----

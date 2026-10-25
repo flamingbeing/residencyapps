@@ -33,7 +33,7 @@ for (const app of apps) {
 
   const shellSrc = sw.match(/const SHELL = \[([\s\S]*?)\];/)?.[1];
   if (!shellSrc) { fail(`${swPath}: no SHELL list`); continue; }
-  const shell = [...shellSrc.matchAll(/'([^']+)'/g)].map(m => m[1]).filter(f => f !== './')
+  const shell = [...shellSrc.matchAll(/'([^']+)'/g)].map(m => m[1]).filter(f => f !== './' && !/^https:\/\//.test(f))   // (other sites: test/sync.test.mjs checks the pins)
     .map(f => path.posix.normalize(`${app}/${f}`));
   for (const f of shell) if (!fs.existsSync(path.join(ROOT, f))) fail(`${swPath}: SHELL lists ${f}, which doesn't exist`);
 }
