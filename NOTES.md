@@ -46,7 +46,8 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
 - **Set up opens locked** (`<fieldset disabled>`); Unlock to edit; it locks again after 5 minutes, a save, or Lock. A new
   card goes inside `lockable(...)` or it stays editable while locked.
 - **Autosave on the device** while typing (`sel-ans-<cycle>-<id>`); demo keys start `sel-demo-` and never touch a real round.
-- **Answers go through app-sync's outbox** (`applicants/js/sync.js`, app-sync 0.4.1 at `core.anawj.com/sync/0.4.1/`): kept
+- **Answers go through app-sync's outbox** (`applicants/js/sync.js`, app-sync 0.6.0 `createApp` at `core.anawj.com/sync/0.6.0/`;
+  createApp's queue, outbox `residencyapps-outbox` and adapter, nothing watched; sign-out runs `forgetDevice` on its parts): kept
   on the device first, then sent in a transaction with `updatedAt` (device ms) and `serverAt` (server time, the rules check
   it). With no signal "Send" says "Saved" and the answer goes by itself later; a refusal (round closed) is shown and set
   aside. The other writes (round, photos, committee, passcodes, retention) go to the SDK through `cloud.docs` and are
@@ -56,6 +57,9 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
   `test/store.test.mjs` checks this and every store path against a made-up Firestore. The round, committee, passcode and
   photo writes stay off app-sync's outbox on purpose for now: its adapter stamps `id`/`serverAt` (and `updatedAt`), which
   those rules' field lists refuse, so moving them is a rules change of its own.
+- **Passcode tokens, two claim shapes** (25 Oct 2026): the rules accept the older `guest`/`role` claims and app-devkit's
+  (`m: 'passcode'`, `g: { _: role }`; codes reader `g: { _: 'codesReader' }`). `tools/test-rules.sh` runs the suite in both
+  (`CLAIMS=kit`). The Worker moves to devkit `custom-token.js` only once these rules are live.
 - **Signing out wipes the offline copy** (shared ward PCs): app-sync `forgetDevice` (the outbox and the SDK's cache). It is
   refused while anything is unsent; the person may still sign out and lose it.
 - **Status chip** (live only, beside the account button): Connecting… until the server has answered once, then Synced,

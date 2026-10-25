@@ -1,0 +1,13 @@
+{
+  "template": "flamingbeing/app-starter",
+  "version": "0.1.0",
+  "commit": "b1be5ac2c142a527d637399dd14fb94a853696a8",
+  "adopted": "2026-10-25",
+  "app": {
+    "name": "residencyapps",
+    "host": "residencyapps.anawj.com",
+    "kit": "",
+    "project": "residencyapps",
+    "title": "Residency Applications"
+  }
+}

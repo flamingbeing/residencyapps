@@ -9,7 +9,10 @@ const env = await initializeTestEnvironment({
   firestore: { rules: fs.readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 },
 });
 const as = (email, verified = true) => env.authenticatedContext(email, { email, email_verified: verified }).firestore();
-const code = (uid, role) => env.authenticatedContext(uid, role ? { guest: true, role } : { guest: true }).firestore();
+// CLAIMS=kit: the passcode tokens in app-devkit's claims shape (worker/custom-token.js: m passcode, g { _: role }),
+// as guest.js issues them since 25 Oct 2026; otherwise the older shape (guest, role), which tokens already issued keep
+const KIT = process.env.CLAIMS === 'kit';
+const code = (uid, role) => env.authenticatedContext(uid, KIT ? { m: 'passcode', g: { _: role || 'guest' }, v: 1 } : role ? { guest: true, role } : { guest: true }).firestore();
 const ADMIN = 'boss@example.com', COM = 'dr.committee@example.com', STRANGER = 'stranger@example.com';
 const HOUR = 36e5;
 const round = (o = {}) => ({ cycle: 'c1', title: 'Round', status: 'open', applicants: [{ id: 'a1', name: 'Applicant One' }], updatedAt: 1, ...o });
@@ -137,7 +140,7 @@ for (const [who, db] of [['guest', g1], ['set-up code', su], ['committee code', 
 }
 
 // ---- the three passcodes ----
-const reader = env.authenticatedContext('codes-reader', { codesReader: true }).firestore();
+const reader = env.authenticatedContext('codes-reader', KIT ? { g: { _: 'codesReader' }, v: 1 } : { codesReader: true }).firestore();
 const codeDoc = (c = 'maple-tree-42') => ({ code: c, updatedAt: 1 });
 await t('admin sets a passcode', assertSucceeds(setDoc(doc(adm, 'selectionCodes', 'guest'), codeDoc())));
 await t('admin sets the setup passcode', assertSucceeds(setDoc(doc(adm, 'selectionCodes', 'setup'), codeDoc('lantern-9-glow'))));
@@ -156,8 +159,15 @@ await t('a passcode needs at least 6 characters', assertFails(setDoc(doc(adm, 's
 await t('a passcode is at most 100 characters', assertFails(setDoc(doc(adm, 'selectionCodes', 'guest'), codeDoc('a'.repeat(101)))));
 await t('a passcode takes no extra fields', assertFails(setDoc(doc(adm, 'selectionCodes', 'guest'), { ...codeDoc(), role: 'admin' })));
 await t('only the three roles have a passcode', assertFails(setDoc(doc(adm, 'selectionCodes', 'admin'), codeDoc())));
+// the kit's shape: only m passcode with one of the three roles is a passcode account
+const kit = claims => env.authenticatedContext('k1', claims).firestore();
+await t('a kit link sign-in is no passcode account', assertFails(getDoc(doc(kit({ m: 'link', g: { _: 'guest' } }), 'selection', 'c1'))));
+await t('a kit passcode with an email is no passcode account', assertFails(getDoc(doc(kit({ m: 'passcode', g: { _: 'guest' }, email: 'k@example.com' }), 'selection', 'c1'))));
+await t('a kit passcode with another role is nothing', assertFails(getDoc(doc(kit({ m: 'passcode', g: { _: 'admin' } }), 'selection', 'c1'))));
+await t('the kit codes reader is no guest', assertFails(getDoc(doc(kit({ g: { _: 'codesReader' } }), 'selection', 'c1'))));
+await t('a kit passcode is no codes reader', assertFails(getDoc(doc(kit({ m: 'passcode', g: { _: 'codesReader' } }), 'selectionCodes', 'guest'))));
 await t('admin clears a passcode', assertSucceeds(deleteDoc(doc(adm, 'selectionCodes', 'setup'))));
 
 await env.cleanup();
-console.log(fail ? `rules: ${fail} of ${n} checks failed` : `rules: ${n} checks passed`);
+console.log((KIT ? '(kit claims) ' : '') + (fail ? `rules: ${fail} of ${n} checks failed` : `rules: ${n} checks passed`));
 process.exit(fail ? 1 : 0);

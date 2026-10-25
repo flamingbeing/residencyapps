@@ -14,7 +14,7 @@ const APP = path.join(ROOT, 'applicants');
 const read = f => fs.readFileSync(path.join(APP, f), 'utf8');
 const SYNC_VERSION = read('js/cloud.js').match(/core\.anawj\.com\/sync\/(\d+\.\d+\.\d+)\//)[1];
 const UPDATE_VERSION = read('js/app-update.js').match(/core\.anawj\.com\/update\/(\d+\.\d+\.\d+)\//)[1];
-const FILES = ['index.js', ...['sync', 'writes', 'conflict', 'store', 'outbox', 'watchdog', 'persist', 'status', 'forget', 'firestore'].map(n => `src/${n}.js`)];
+const FILES = ['index.js', ...['sync', 'writes', 'conflict', 'store', 'outbox', 'watchdog', 'persist', 'status', 'forget', 'firestore', 'registry', 'report', 'app'].map(n => `src/${n}.js`)];
 
 async function engine() {
   let dir = process.env.APP_SYNC_DIR;
@@ -76,14 +76,15 @@ const answer = (name = 'Anonymous') => ({ id: ME, email: ME, name, answers: { a1
 async function setup({ persisted = true } = {}) {
   const f = fakeFirestore(), outbox = memoryOutbox();
   let up = true;
-  const s = createSaving({ AS, sdk: async () => ({ F: f.F, db: f.db }), store: outbox, online: () => up, persist: async () => ({ supported: true, persisted }) });
+  const A = { onAuthStateChanged: () => () => {} };
+  const s = createSaving({ AS, sdk: async () => ({ A, F: f.F, auth: { currentUser: null }, db: f.db }), store: outbox, storage: null, online: () => up, persist: async () => ({ supported: true, persisted }) });
   await s.activate(ME);
   return { s, f, outbox, offline: v => { up = !v; f.server.mode = v ? 'down' : 'up'; } };
 }
 const waitFor = async (fn, ms = 3000) => { const t = Date.now(); while (!fn()) { if (Date.now() - t > ms) throw new Error('timed out'); await new Promise(r => setTimeout(r, 20)); } };
 
 test('the engine and the update module are pinned to one exact version everywhere', () => {
-  assert.equal(SYNC_VERSION, '0.4.1');
+  assert.equal(SYNC_VERSION, '0.6.0');
   assert.equal(UPDATE_VERSION, '0.2.0');
   const sw = read('sw.js');
   for (const f of FILES) assert.ok(sw.includes(`'https://core.anawj.com/sync/${SYNC_VERSION}/${f}'`), `sw.js SHELL has sync ${f}`);
