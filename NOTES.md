@@ -68,7 +68,7 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
 
 - `node test/model.test.mjs`: the logic. `node --test test/sync.test.mjs`: sending through the outbox (the real app-sync
   against a made-up Firestore) and the version pins. `node --test test/store.test.mjs`: every store read and write. `node test/e2e.mjs`: every role in the demo at phone size, with axe
-  (`AXE_PATH=<axe.min.js>`). `bash tools/test-rules.sh`: the rules in the emulator (Java). `node tools/check.mjs`: repo
+  (`AXE_PATH=<axe.min.js>`). `bash tools/test-rules.sh`: the rules in the emulator (Java). `node .devkit/tools/check.mjs`: repo
   checks and Worker tests. All run in Checks on every PR.
 - Demo: `?demo` (`=guest`, `=setup`, `=committee`, `=admin`; `=reset` starts over); the account sheet switches role.
 

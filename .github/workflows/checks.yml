@@ -22,8 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: flamingbeing/app-devkit/setup-node@v1.1.0
+      - uses: flamingbeing/app-devkit/setup-tools@v1.6.0
       - name: Repo check (and Worker tests)
-        run: node tools/check.mjs
+        run: node .devkit/tools/check.mjs
       - name: Model tests
         run: node test/model.test.mjs
       - name: Sending through app-sync (outbox, status, sign-out) and the version pins
@@ -31,7 +32,7 @@ jobs:
       - name: The shared store through cloud.js (every read and write path)
         run: node --test test/store.test.mjs
       - name: Proof-read (pages and documents)
-        run: node tools/proofread.mjs
+        run: node .devkit/tools/proofread.mjs
 
   rules:
     runs-on: ubuntu-24.04
