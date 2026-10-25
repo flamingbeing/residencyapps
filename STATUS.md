@@ -4,13 +4,14 @@
 - Live at residencyapps.anawj.com (23 Oct 2026); the old apmes address forwards here.
 
 ## Waiting on the owner
-- Deploy `firestore.rules` (accepts both passcode claim shapes); then the Worker moves to app-devkit `custom-token.js`.
 - Share the new link.
 
 ## Next
 1. An alert for project `residencyapps` (the daily backup runs since 23 Oct).
 
 ## Recently done
+- 25 Oct 2026: `firestore.rules` (accepts both passcode claim shapes) deployed; the released ruleset matches main. The Worker
+  now signs passcode tokens with app-devkit's `custom-token.js` (#14).
 - 25 Oct 2026: app-sync 0.6.0 → 0.6.3 (pin only: cloud.js, sw.js, test pin; answers use `backend.merge`, so held saves
   are not used; no rules change).
 - 25 Oct 2026: app-sync 0.6.0 `createApp` for the answers outbox; rules accept app-devkit's claims shape too;
