@@ -84,7 +84,7 @@ async function setup({ persisted = true } = {}) {
 const waitFor = async (fn, ms = 3000) => { const t = Date.now(); while (!fn()) { if (Date.now() - t > ms) throw new Error('timed out'); await new Promise(r => setTimeout(r, 20)); } };
 
 test('the engine and the update module are pinned to one exact version everywhere', () => {
-  assert.equal(SYNC_VERSION, '0.6.0');
+  assert.equal(SYNC_VERSION, '0.6.3');
   assert.equal(UPDATE_VERSION, '0.2.0');
   const sw = read('sw.js');
   for (const f of FILES) assert.ok(sw.includes(`'https://core.anawj.com/sync/${SYNC_VERSION}/${f}'`), `sw.js SHELL has sync ${f}`);

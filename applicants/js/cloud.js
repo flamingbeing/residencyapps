@@ -9,7 +9,7 @@ import { FIREBASE_CONFIG } from './firebase-config.js';
 import { createSaving } from './sync.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-const SYNC = 'https://core.anawj.com/sync/0.6.0/index.js';   // app-sync, one exact version (also in sw.js SHELL)
+const SYNC = 'https://core.anawj.com/sync/0.6.3/index.js';   // app-sync, one exact version (also in sw.js SHELL)
 const params = (() => { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } })();
 export const demo = params.has('demo');
 export const enabled = demo || !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
