@@ -46,11 +46,23 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
 - **Set up opens locked** (`<fieldset disabled>`); Unlock to edit; it locks again after 5 minutes, a save, or Lock. A new
   card goes inside `lockable(...)` or it stays editable while locked.
 - **Autosave on the device** while typing (`sel-ans-<cycle>-<id>`); demo keys start `sel-demo-` and never touch a real round.
-- Signing out wipes the offline copy (shared ward PCs).
+- **Answers go through app-sync's outbox** (`applicants/js/sync.js`, app-sync 0.4.1 at `core.anawj.com/sync/0.4.1/`): kept
+  on the device first, then sent in a transaction with `updatedAt` (device ms) and `serverAt` (server time, the rules check
+  it). With no signal "Send" says "Saved" and the answer goes by itself later; a refusal (round closed) is shown and set
+  aside. The other writes (round, photos, committee, passcodes, retention) still go straight to the SDK but are counted
+  (`track`), so the status chip and the sign-out check see them.
+- **Signing out wipes the offline copy** (shared ward PCs): app-sync `forgetDevice` (the outbox and the SDK's cache). It is
+  refused while anything is unsent; the person may still sign out and lose it.
+- **Status chip** (live only, beside the account button): Connecting… until the server has answered once, then Synced,
+  Sending…, N waiting: offline, Couldn't send. "Not sent yet" only while offline with storage the browser may clear.
+- **Updates** (`sw.js`, app-update 0.2.0 at `core.anawj.com/update/0.2.0/`): a new version installs and waits; the page
+  reloads into it only when no one is typing, no sheet is open and nothing is sending. Both versions are exact pins, the
+  same in `sw.js` SHELL, `js/cloud.js` and `js/app-update.js` (`test/sync.test.mjs` checks). `?nosw` runs without it.
 
 ## How to test
 
-- `node test/model.test.mjs`: the logic. `node test/e2e.mjs`: every role in the demo at phone size, with axe
+- `node test/model.test.mjs`: the logic. `node --test test/sync.test.mjs`: sending through the outbox (the real app-sync
+  against a made-up Firestore) and the version pins. `node test/e2e.mjs`: every role in the demo at phone size, with axe
   (`AXE_PATH=<axe.min.js>`). `bash tools/test-rules.sh`: the rules in the emulator (Java). `node tools/check.mjs`: repo
   checks and Worker tests. All run in Checks on every PR.
 - Demo: `?demo` (`=guest`, `=setup`, `=committee`, `=admin`; `=reset` starts over); the account sheet switches role.

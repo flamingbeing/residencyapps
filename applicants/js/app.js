@@ -15,6 +15,7 @@ import {
 } from './model.js';
 import * as store from './store.js';
 import { passportJpeg } from './photo.js';
+import { startUpdates, retryUpdate } from './app-update.js';
 
 // who is signed in: { email, name, uid, guest?, role? } (cloud.js), and a Google sign-in's { admin, committee }
 const S = { user: null, roles: { admin: false, committee: false } };
@@ -109,7 +110,38 @@ function header(title, { back = false } = {}) {
   subEl.textContent = 'Demo'; subEl.hidden = !cloud.demo;
   backEl.hidden = !back;
   backEl.onclick = () => { history.length > 1 && route().name !== 'home' ? history.back() : go('#'); };
-  fill(meEl, S.user ? h('button', { type: 'button', class: 'a-bar-btn e-appbar__me', title: S.user.email, 'aria-label': 'Account', onclick: account }, h('span', { class: 'a-avatar', 'aria-hidden': 'true' }, initials(S.user.name || S.user.email))) : null);
+  fill(meEl, S.user && chipEl ? chipEl : null, S.user ? h('button', { type: 'button', class: 'a-bar-btn e-appbar__me', title: S.user.email, 'aria-label': 'Account', onclick: account }, h('span', { class: 'a-avatar', 'aria-hidden': 'true' }, initials(S.user.name || S.user.email))) : null);
+}
+
+// ---------- sending status (live only): the outbox and the writes sent straight to the SDK (sync.js) ----------
+
+const CHIP = { attention: 'Couldn’t send', 'at-risk': n => `${n} not sent yet`, offline: n => `${n} waiting: offline`, saving: 'Sending…', stale: 'Checking…', unknown: 'Connecting…', synced: 'Synced' };
+let saving = null, chipEl = null;
+function drawChip() {
+  if (!saving || !chipEl) return;
+  const { state, count } = saving.status();
+  const t = CHIP[state];
+  chipEl.textContent = typeof t === 'function' ? t(count) : t;
+  chipEl.dataset.state = state;
+}
+if (!cloud.demo && cloud.enabled) {
+  chipEl = h('span', { class: 'sl-sync', id: 'sync', role: 'status', 'aria-live': 'polite' });
+  cloud.sending().then(sv => { saving = sv; sv?.onChange(() => { drawChip(); if (sv.canReload()) retryUpdate(); }); drawChip(); }, e => console.warn('Outbox unavailable', e));
+}
+// The update module reloads into a new version only when no one is typing, no sheet is open and nothing is sending.
+let lastKey = 0;
+addEventListener('input', () => { lastKey = Date.now(); }, true);
+const typing = () => Date.now() - lastKey < 4000 || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+startUpdates({ canReload: () => !typing() && !document.querySelector('dialog[open]') && (!saving || saving.canReload()) });
+
+// Sign-out refuses while something hasn't reached the server; the person can still choose to sign out and lose it.
+async function signOutNow() {
+  let r = await cloud.signOut();
+  if (!r.ok && r.unsent) {
+    if (!await confirmBox('Not sent yet', 'Some of your changes haven’t reached the server yet (no signal?). Stay signed in until the status at the top says Synced, or sign out and lose them.', 'Sign out anyway', true)) return;
+    r = await cloud.signOut({ force: true });
+  }
+  if (!cloud.demo) location.reload();
 }
 
 function account() {
@@ -127,7 +159,7 @@ function account() {
         del(K.ans(round.cycle, S.user.email)); m.close(); loadMine().then(render);
       } }, 'Clear my answers') : null,
       h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Close'),
-      h('button', { class: 'a-btn', type: 'button', onclick: async () => { m.close(); await cloud.signOut(); if (!cloud.demo) location.reload(); } }, 'Sign out')),
+      h('button', { class: 'a-btn', type: 'button', onclick: async () => { m.close(); await signOutNow(); } }, 'Sign out')),
   ]);
 }
 
@@ -255,8 +287,8 @@ function reviewScreen() {
     if (p.done + p.partial === 0 && !await confirmBox('Nothing to send', 'You haven’t answered about anyone. Send anyway?', 'Send anyway')) return;
     send.disabled = true; status.textContent = 'Sending…';
     try {
-      const via = await deliver(who);
-      sent = { at: Date.now(), via }; saveMine();
+      const out = await deliver(who), via = out.via;
+      sent = { at: Date.now(), via, ...(out.waiting ? { waiting: true } : {}) }; saveMine();
       if (via === 'device' || via === 'form') {
         const list = subs().filter(s => s.by !== S.user.email); list.push({ by: S.user.email, name: who, at: sent.at, answers });
         put(K.subs(round.cycle), list);
@@ -292,16 +324,17 @@ function reviewScreen() {
 async function deliver(who) {
   if (round.shared) {
     // Mirror on: the Google Form (source of truth) and the shared store (backup) both get it; one failing doesn't lose the answer.
+    // (the store's 'waiting': kept in this device's outbox, it goes by itself once back online)
     if (round.mirror && canMirror(round) && !cloud.demo) {
       const [f, b] = await Promise.allSettled([postToForm(who), store.sendResponse(round, S.user, who, answers)]);
       if (f.status === 'rejected' && b.status === 'rejected') throw b.reason;
-      return f.status === 'rejected' ? 'store' : b.status === 'rejected' ? 'form' : 'both';
+      return { via: f.status === 'rejected' ? 'store' : b.status === 'rejected' ? 'form' : 'both', waiting: f.status === 'rejected' && b.value === 'waiting' };
     }
-    await store.sendResponse(round, S.user, who, answers); return 'store';
+    return { via: 'store', waiting: (await store.sendResponse(round, S.user, who, answers)) === 'waiting' };
   }
-  if (cloud.demo || !round.form) return 'device';
+  if (cloud.demo || !round.form) return { via: 'device' };
   await postToForm(who);
-  return 'form';
+  return { via: 'form' };
 }
 async function postToForm(who) {
   if (!navigator.onLine) throw new Error('No signal.');
@@ -310,8 +343,9 @@ async function postToForm(who) {
 
 function doneScreen() {
   header('Thank you');
-  fill(app, h('div', { class: 'e-stack sl-col' }, empty('Sent. Thank you.',
-    sent?.via !== 'device' ? 'Your feedback went to the selection committee. You can come back and change it, then send again.' : 'Your feedback is saved on this device for the committee.',
+  fill(app, h('div', { class: 'e-stack sl-col' }, empty(sent?.waiting ? 'Saved. Thank you.' : 'Sent. Thank you.',
+    sent?.waiting ? 'No signal just now: your feedback is kept on this device and goes to the selection committee by itself once you’re back online. Open the app again later; the status at the top says Synced once it has gone.'
+    : sent?.via !== 'device' ? 'Your feedback went to the selection committee. You can come back and change it, then send again.' : 'Your feedback is saved on this device for the committee.',
     h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', type: 'button', onclick: () => go('#') }, 'Back to the list')))));
 }
 
@@ -626,7 +660,7 @@ async function render() {
   if (!mayIn()) {
     header('NUHS Residency Applications');
     fill(app, empty('Not an admin account', `${S.user.email} isn’t an admin or on the selection committee. Everyone else signs in with the passcode they were given.`,
-      h('button', { class: 'a-btn', type: 'button', onclick: async () => { await cloud.signOut(); if (!cloud.demo) location.reload(); } }, 'Sign out')));
+      h('button', { class: 'a-btn', type: 'button', onclick: () => signOutNow() }, 'Sign out')));
     return;
   }
   if (n !== seq) return;
