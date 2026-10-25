@@ -46,7 +46,7 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
 - **Set up opens locked** (`<fieldset disabled>`); Unlock to edit; it locks again after 5 minutes, a save, or Lock. A new
   card goes inside `lockable(...)` or it stays editable while locked.
 - **Autosave on the device** while typing (`sel-ans-<cycle>-<id>`); demo keys start `sel-demo-` and never touch a real round.
-- **Answers go through app-sync's outbox** (`applicants/js/sync.js`, app-sync 0.4.0 at `core.anawj.com/sync/0.4.0/`): kept
+- **Answers go through app-sync's outbox** (`applicants/js/sync.js`, app-sync 0.4.1 at `core.anawj.com/sync/0.4.1/`): kept
   on the device first, then sent in a transaction with `updatedAt` (device ms) and `serverAt` (server time, the rules check
   it). With no signal "Send" says "Saved" and the answer goes by itself later; a refusal (round closed) is shown and set
   aside. The other writes (round, photos, committee, passcodes, retention) still go straight to the SDK but are counted

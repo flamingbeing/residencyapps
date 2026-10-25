@@ -7,12 +7,12 @@
 - Share the new link.
 
 ## Next
-1. On merging the app-sync 0.4.0 PR: deploy `firestore.rules` first (they take both the old and the new answer shape),
+1. On merging the app-sync 0.4.1 PR: deploy `firestore.rules` first (they take both the old and the new answer shape),
    then the app.
 2. An alert for project `residencyapps` (the daily backup runs since 23 Oct).
 
 ## Recently done
-- 25 Oct 2026: app-sync 0.4.0 (answers through the outbox, status chip, `forgetDevice` at sign-out) and the update
+- 25 Oct 2026: app-sync 0.4.1 (answers through the outbox, status chip, `forgetDevice` at sign-out) and the update
   module 0.2.0 (offline shell, no reload while typing or sending); rules take `serverAt` (deploy them with the merge).
 - 23 Oct 2026: cut-over: Firebase project `residencyapps` (rules, Google sign-in, domain), web config and key,
   Worker secrets, live round copied (counts match), old address forwards.
