@@ -11,6 +11,8 @@
 1. An alert for project `residencyapps` (the daily backup runs since 23 Oct).
 
 ## Recently done
+- 25 Oct 2026: app-sync 0.6.0 → 0.6.3 (pin only: cloud.js, sw.js, test pin; answers use `backend.merge`, so held saves
+  are not used; no rules change).
 - 25 Oct 2026: app-sync 0.6.0 `createApp` for the answers outbox; rules accept app-devkit's claims shape too;
   `.starter.json` (adopted app-starter).
 - 25 Oct 2026: app-sync 0.4.1 (answers through the outbox, status chip, `forgetDevice` at sign-out) and the update

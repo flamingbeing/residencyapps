@@ -4,7 +4,7 @@
 // silently. The SDK's own offline queue is never used for answers. The other writes (the round, photos, the committee,
 // passcodes, the retention delete) still go straight to the SDK (cloud.js docs): they are counted here (track), so the
 // status and the sign-out check know they are not on the server yet.
-// The wiring is app-sync's createApp (0.6.0): its write queue, outbox and Firestore adapter; nothing is watched (the
+// The wiring is app-sync's createApp (0.6.3): its write queue, outbox and Firestore adapter; nothing is watched (the
 // screens read through cloud.js docs), and sign-out runs forgetDevice on createApp's parts (force skips the unsent check).
 // The engine (AS), the Firebase SDK and the browser bits are passed in, so test/sync.test.mjs runs it in Node.
 //
