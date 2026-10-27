@@ -1,0 +1,55 @@
+# Deploys a changed firestore.rules to its Firebase project on merge to main (AGENTS.md, "Rules are vital").
+# The rules tests run first in the emulator (tools/test-rules.sh), so a failing rule leaves the live rules as they were.
+# Signs in without a key (Workload Identity Federation) as the rules-deployer service account (Firebase Rules Admin).
+# Needs repo variables FIREBASE_PROJECT, WIF_PROVIDER and RULES_DEPLOYER; until all three are set, the run skips
+# cleanly. A manual run (Run workflow) deploys the rules over the live ones: ask the owner.
+name: Deploy Firestore rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-firestore-rules
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Ready to deploy?
+        id: ready
+        env:
+          PROJECT: ${{ vars.FIREBASE_PROJECT }}
+          PROVIDER: ${{ vars.WIF_PROVIDER }}
+          ACCOUNT: ${{ vars.RULES_DEPLOYER }}
+        run: |
+          if [ -z "$PROJECT" ] || [ -z "$PROVIDER" ] || [ -z "$ACCOUNT" ]; then
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipped. Set the repo variables FIREBASE_PROJECT, WIF_PROVIDER and RULES_DEPLOYER first."
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.go == 'true'
+      - uses: flamingbeing/app-devkit/setup-node@v1.1.0
+        if: steps.ready.outputs.go == 'true'
+      - name: Firestore rules tests (local emulator, demo project)
+        if: steps.ready.outputs.go == 'true'
+        run: bash tools/test-rules.sh
+      - uses: google-github-actions/auth@v2
+        if: steps.ready.outputs.go == 'true'
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.RULES_DEPLOYER }}
+      - name: Deploy firestore.rules
+        if: steps.ready.outputs.go == 'true'
+        run: npx --yes firebase-tools@13 deploy --only firestore:rules --project "${{ vars.FIREBASE_PROJECT }}" --non-interactive
