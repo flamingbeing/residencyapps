@@ -20,6 +20,8 @@ repo; never copy anything from there into this repo, a PR or an issue (neutral p
   listed by hand in `admins/` in the Firebase console. No passcode or secret goes in this repo.
 - **Rules are vital:** every change to `firestore.rules` gets a case in `test/rules.emulator.mjs` and a green
   `bash tools/test-rules.sh` before merge. The collection names (`selection*`) stay as they are (copied data).
+  On merge, `.github/workflows/deploy-firestore-rules.yml` tests and releases them (keyless; skips until its repo
+  variables are set).
 - Details and lessons: `NOTES.md`.
 
 ## Checks before merging
