@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en-GB">
+<html lang="en-GB" class="glass">
 <head>
 <meta charset="utf-8">
 <script>addEventListener('beforeinstallprompt', e => e.preventDefault());</script>
@@ -8,7 +8,8 @@
 <meta name="referrer" content="no-referrer">
 <title>NUHS Residency Applications</title>
 <meta name="description" content="Confidential feedback on residency applicants.">
-<meta name="theme-color" content="#f9f9fb">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Applicants">
@@ -19,11 +20,12 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" media="print" onload="this.media='all'">
-<script>
-  // the theme chosen on this device (js/ui.js, THEME_KEY), before the first paint
-  try { var t = localStorage.getItem('residencyapps-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; if (t === 'dark') document.querySelector('meta[name="theme-color"]').content = '#161618'; } catch (e) {}
-</script>
+<script src="https://core.anawj.com/ui/1.0.0-rc.27/theme/early.js"></script>
+<!-- the app kit (app-ui, look A by default): its theme sheet (not glass.css or layout.css: the NUHS kit draws the bars and screens); the look, light / dark, density and
+     Glass or Solid are chosen per device under Account (js/app.js) and early.js puts them back before the first paint.
+     The NUHS kit (design.anawj.com/v1/) still draws the screens: its --a-* colours follow the app kit (style.css) -->
 <link rel="stylesheet" href="https://design.anawj.com/v1/tokens.css">
+<link rel="stylesheet" href="https://core.anawj.com/ui/1.0.0-rc.27/theme/theme.css">
 <link rel="stylesheet" href="https://design.anawj.com/v1/app.css">
 <link rel="stylesheet" href="style.css">
 <script src="https://design.anawj.com/v1/app.js" defer></script>
@@ -52,7 +54,7 @@
   .sl-name { margin: 0; font-size: 20px; line-height: 1.2; }
   .sl-apstat { font-size: var(--a-text-xs); font-weight: 600; color: var(--a-ink-2); min-height: 1.2em; }
   .sl-na { min-height: 44px; padding: 8px 14px; border-radius: 12px; border: 1.5px solid var(--a-tint); background: transparent; color: var(--a-tint); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
-  .sl-na[aria-pressed="true"] { background: var(--a-tint); color: #fff; }
+  .sl-na[aria-pressed="true"] { background: var(--a-tint); color: var(--a-tint-ink); }
   .sl-na:focus-visible, .sl-tile:focus-visible { outline: 3px solid var(--a-focus); outline-offset: 2px; }
   .sl-skipped { margin: 14px 0 0; }
   .sl-qs { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
@@ -63,13 +65,13 @@
   .sl-scores label { position: relative; display: flex; align-items: center; justify-content: center; min-height: 56px; border-radius: 12px; background: var(--a-surface-2); cursor: pointer; }
   .sl-scores input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
   .sl-scores b { font-size: 22px; line-height: 1; }
-  .sl-scores label:has(input:checked) { background: var(--a-tint); color: #fff; }
+  .sl-scores label:has(input:checked) { background: var(--a-tint); color: var(--a-tint-ink); }
   .sl-scores label:has(input:focus-visible) { outline: 3px solid var(--a-focus); outline-offset: 2px; }
   .sl-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: var(--a-text-xs); color: var(--a-ink-2); }
   .sl-ta { min-height: 56px; }
   .sl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
   .sl-chip { min-height: 44px; padding: 8px 14px; border-radius: 22px; border: 1.5px solid var(--a-tint); background: transparent; color: var(--a-tint); font: inherit; font-size: var(--a-text-sm); font-weight: 600; cursor: pointer; }
-  .sl-chip[aria-pressed="true"] { background: var(--a-tint); color: #fff; }
+  .sl-chip[aria-pressed="true"] { background: var(--a-tint); color: var(--a-tint-ink); }
   .sl-chip:focus-visible { outline: 3px solid var(--a-focus); outline-offset: 2px; }
   .sl-saved { font-size: var(--a-text-xs); color: var(--a-ink-2); min-width: 3em; text-align: center; }
   .sl-fixed { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--a-surface); border-top: .5px solid var(--a-sep); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }

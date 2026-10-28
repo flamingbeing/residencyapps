@@ -46,8 +46,9 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
 - **Set up opens locked** (`<fieldset disabled>`); Unlock to edit; it locks again after 5 minutes, a save, or Lock. A new
   card goes inside `lockable(...)` or it stays editable while locked.
 - **Autosave on the device** while typing (`sel-ans-<cycle>-<id>`); demo keys start `sel-demo-` and never touch a real round.
-- **Answers go through app-sync's outbox** (`applicants/js/sync.js`, app-sync 0.6.3 `createApp` at `core.anawj.com/sync/0.6.3/`;
-  createApp's queue, outbox `residencyapps-outbox` and adapter, nothing watched; sign-out runs `forgetDevice` on its parts): kept
+- **Answers go through app-sync's outbox** (`applicants/js/sync.js`, app-sync 1.5.2 modules at `core.anawj.com/sync/1.5.2/`:
+  `createApp({ modules: [auth(), sync()] })`, outbox `residencyapps-outbox`, nothing watched; sign-in stays the app's own,
+  the auth module follows Firebase; sign-out is the auth module's `forget`): kept
   on the device first, then sent in a transaction with `updatedAt` (device ms) and `serverAt` (server time, the rules check
   it). With no signal "Send" says "Saved" and the answer goes by itself later; a refusal (round closed) is shown and set
   aside. The other writes (round, photos, committee, passcodes, retention) go to the SDK through `cloud.docs` and are
@@ -60,13 +61,20 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
 - **Passcode tokens, two claim shapes** (25 Oct 2026): the rules accept the older `guest`/`role` claims and app-devkit's
   (`m: 'passcode'`, `g: { _: role }`; codes reader `g: { _: 'codesReader' }`). `tools/test-rules.sh` runs the suite in both
   (`CLAIMS=kit`). The Worker moves to devkit `custom-token.js` only once these rules are live.
-- **Signing out wipes the offline copy** (shared ward PCs): app-sync `forgetDevice` (the outbox and the SDK's cache). It is
-  refused while anything is unsent; the person may still sign out and lose it.
+- **Signing out wipes the offline copy** (shared ward PCs): the auth module's `forget` (the outbox and the SDK's cache). It
+  is refused while anything is unsent; the person may still sign out and lose it. Passcode accounts are new per sign-in, so
+  a new passcode sign-in on a device whose last one left answers unsent is refused and says so ("unsent").
 - **Status chip** (live only, beside the account button): Connecting… until the server has answered once, then Synced,
   Sending…, N waiting: offline, Couldn't send. "Not sent yet" only while offline with storage the browser may clear.
-- **Updates** (`sw.js`, app-update 0.2.0 at `core.anawj.com/update/0.2.0/`): a new version installs and waits; the page
+- **Updates** (`sw.js`, app-sync's update module 1.5.2 at `core.anawj.com/update/1.5.2/`): a new version installs and waits; the page
   reloads into it only when no one is typing, no sheet is open and nothing is sending. Both versions are exact pins, the
   same in `sw.js` SHELL, `js/cloud.js` and `js/app-update.js` (`test/sync.test.mjs` checks). `?nosw` runs without it.
+- **Look: two kits** (`index.html`, `style.css`): the NUHS kit (`design.anawj.com/v1/`: app.css, app.js, the `.a-*`
+  classes) still draws every screen, and the app kit (app-ui 1.0.0-rc.27 at `core.anawj.com/ui/`: early.js, theme.css,
+  `theme/index.js` in `js/ui.js`, cool ground; not glass.css or layout.css, which style bare dialogs and buttons) sets the colours: once it has painted (`html[data-look]`) the
+  `--a-*` tokens come from its tokens. Look A, NUHS navy accent, light / dark following the phone; each device can change
+  look, theme, density and Glass or Solid under Account, "Look on this device". The kit files are in `sw.js` SHELL at
+  the same exact version (`test/sync.test.mjs` checks). Kit sheets load before app.css, so the NUHS classes win on ties.
 
 ## How to test
 

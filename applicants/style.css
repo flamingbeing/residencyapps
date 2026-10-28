@@ -1,6 +1,7 @@
 /*
   The app's own pieces on top of the NUHS app kit (design.anawj.com/v1/: tokens.css, app.css, the .a-* classes). Colours come
-  from the kit's --a-* tokens, so the dark theme follows the kit. Mobile first, content max 720px. Classes are e- prefixed
+  from the kit's --a-* tokens, and those follow the app kit (app-ui @core/theme, index.html) once it has painted
+  (html[data-look], below): the device's look, light / dark (Auto follows the phone), accent and Glass or Solid. Mobile first, content max 720px. Classes are e- prefixed
   (shared look with the owner's other apps); the questionnaire's own .sl-* classes are in index.html.
 */
 :root {
@@ -36,6 +37,34 @@
   --n-bg-blue: var(--a-tint-soft);
   --e-scroll-top: calc(var(--a-safe-t) + var(--a-band) + var(--a-bar-h) + 8px);
 }
+:root[data-look] {
+  /* the NUHS kit's colours from the app kit's tokens (only under data-look: before the app kit paints they would be
+     circular). On the cool ground (js/ui.js) the mixes give the NUHS kit's own light values: fields #e9e9ef, bars
+     #f9f9fb at 82%, soft tint #e2ebf6, captions near #767c84; and follow any other look, ground or accent */
+  --a-font: var(--font); --a-bg: var(--bg); --a-surface: var(--surface);
+  --a-surface-2: light-dark(color-mix(in srgb, var(--text) 4%, var(--bg)), color-mix(in srgb, var(--text) 8%, var(--surface)));
+  --a-bar: color-mix(in srgb, color-mix(in srgb, var(--surface), var(--bg)) 82%, transparent);
+  --a-sep: color-mix(in srgb, var(--text) 22%, transparent);
+  --a-ink: var(--text); --a-ink-2: var(--muted); --a-ink-3: color-mix(in srgb, var(--muted) 85%, var(--surface));
+  --a-tint: var(--accent); --a-tint-ink: var(--on-accent);
+  --a-tint-soft: light-dark(oklch(from var(--accent) .93 .025 h), color-mix(in srgb, var(--accent) 14%, var(--surface)));
+  --a-danger: var(--danger); --a-danger-bg: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  --a-ok: var(--ok); --a-ok-bg: color-mix(in srgb, var(--ok) 14%, var(--surface));
+  --a-warn: var(--warn); --a-warn-bg: color-mix(in srgb, var(--warn) 16%, var(--surface));
+  --a-focus: var(--focus); --a-backdrop: var(--backdrop);
+  --e-ok-ink: var(--ok);
+  /* tokens.css says light only; the app kit follows the phone unless this device picked one */
+  color-scheme: light dark;
+}
+:root[data-look][data-theme="light"] { color-scheme: light; }
+:root[data-look][data-theme="dark"] { color-scheme: dark; }
+:root[data-look] .a-btn--tinted { color: var(--a-tint); }
+/* the app kit gives h1 the look's heading face (a serif in look A); the titles stay in the text face */
+:root[data-look] :is(.a-title, .a-bar-title) { font-family: var(--a-font); }
+/* Glass is the NUHS kit's own see-through bars (the app kit's glass.css styles bare dialogs, buttons and .bar for its
+   own apps, so it is not loaded). Solid (the switch, or the glass guard): the bars are the plain surface */
+:root[data-look]:not(.glass) { --a-bar: var(--surface); }
+:root[data-look]:not(.glass) :is(.a-bar, .a-tabbar) { -webkit-backdrop-filter: none; backdrop-filter: none; }
 html { scroll-padding-top: var(--e-scroll-top); scroll-padding-bottom: calc(var(--a-tab-h) + 80px); }
 :where(.a-app) p { margin: 0 0 12px; }
 .e-ico { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

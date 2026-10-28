@@ -1,18 +1,12 @@
 // Small UI helpers for the app's screens (app.js). The look comes from the NUHS app kit (design.anawj.com/v1/: the .a-*
 // classes, sheets, alerts, toasts) and style.css (the .e-* pieces).
 
-// Light (default), dark, or auto (follows the phone); kept on this device. index.html applies it before the first paint.
-export const THEME_KEY = 'residencyapps-theme';
-const darkQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
-export function themePref() {
-  try { const t = localStorage.getItem(THEME_KEY); return ['light', 'dark', 'auto'].includes(t) ? t : 'light'; } catch { return 'light'; }
-}
-export function applyTheme(pref = themePref()) {
-  if (typeof document === 'undefined') return;
-  const dark = pref === 'dark' || (pref === 'auto' && !!darkQuery?.matches);
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#161618' : '#f9f9fb');
-}
+// The app kit's theme (app-ui @core/theme, one exact version; sw.js keeps it offline): look A unless this device picks
+// another under Account, NUHS navy as the accent, light / dark following the phone unless picked. import() so a
+// blocked core.anawj.com leaves the NUHS kit's own light look.
+export const KIT = 'https://core.anawj.com/ui/1.0.0-rc.27/';
+export const theme = typeof document === 'undefined' ? Promise.resolve(null)
+  : import(KIT + 'theme/index.js').then(t => { t.applyTheme({ accent: '#002f6c', surface: 'cool' }); return t; }).catch(() => null);
 
 // h('p', { class: 'x', onclick }, 'text', child): one element; null and false children are skipped
 export function h(tag, attrs = {}, ...kids) {
