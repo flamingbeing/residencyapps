@@ -14,7 +14,16 @@ const APP = path.join(ROOT, 'applicants');
 const read = f => fs.readFileSync(path.join(APP, f), 'utf8');
 const SYNC_VERSION = read('js/cloud.js').match(/core\.anawj\.com\/sync\/(\d+\.\d+\.\d+)\//)[1];
 const UPDATE_VERSION = read('js/app-update.js').match(/core\.anawj\.com\/update\/(\d+\.\d+\.\d+)\//)[1];
-const FILES = ['index.js', ...['sync', 'writes', 'conflict', 'store', 'outbox', 'watchdog', 'persist', 'status', 'forget', 'firestore', 'registry', 'report', 'app'].map(n => `src/${n}.js`)];
+// what the app loads: index.js and the app, auth and sync modules (entries.json lists each one's files)
+const ENTRIES = ['app', 'auth', 'sync'];
+const FILES = await (async () => {
+  if (process.env.APP_SYNC_DIR) return [];
+  const res = await fetch(`https://core.anawj.com/sync/${SYNC_VERSION}/entries.json`);
+  assert.equal(res.status, 200, 'fetch entries.json');
+  const entries = await res.json();
+  const index = (await (await fetch(`https://core.anawj.com/sync/${SYNC_VERSION}/files.json`)).json());
+  return [...new Set([...(Array.isArray(index) ? index : index.files), ...ENTRIES.flatMap(e => entries[e])])].sort();
+})();
 
 async function engine() {
   let dir = process.env.APP_SYNC_DIR;
@@ -29,7 +38,9 @@ async function engine() {
       fs.writeFileSync(to, await res.text());
     }
   }
-  return import(pathToFileURL(path.join(dir, 'index.js')).href);
+  const load = f => import(pathToFileURL(path.join(dir, f)).href);
+  const [AS, { createApp }, { auth }, { sync }] = await Promise.all(['index.js', 'app.js', 'auth.js', 'sync.js'].map(load));
+  return { AS, createApp, auth, sync };
 }
 
 // ---- a made-up Firestore: documents in a Map, transactions that fail as the network or the rules say ----
@@ -69,23 +80,38 @@ function memoryOutbox() {
     async forget(owner) { for (const [k, x] of m) if (!owner || x.owner === owner) m.delete(k); }, size: () => m.size,
   };
 }
-const AS = await engine();
+const core = await engine();
 const { createSaving, KIND } = await import(pathToFileURL(path.join(APP, 'js/sync.js')).href);
 const ME = 'guest-u1';
-const answer = (name = 'Anonymous') => ({ id: ME, email: ME, name, answers: { a1: { score: 4, comment: 'Kind.' } } });
-async function setup({ persisted = true } = {}) {
-  const f = fakeFirestore(), outbox = memoryOutbox();
-  let up = true;
-  const A = { onAuthStateChanged: () => () => {} };
-  const s = createSaving({ AS, sdk: async () => ({ A, F: f.F, auth: { currentUser: null }, db: f.db }), store: outbox, storage: null, online: () => up, persist: async () => ({ supported: true, persisted }) });
-  await s.activate(ME);
-  return { s, f, outbox, offline: v => { up = !v; f.server.mode = v ? 'down' : 'up'; } };
+const answer = (name = 'Anonymous', id = ME) => ({ id, email: id, name, answers: { a1: { score: 4, comment: 'Kind.' } } });
+// made-up Firebase Auth: a passcode's custom token 'tok-<uid>' signs in that uid (no email), as the Worker's do
+function fakeAuth() {
+  const auth = { currentUser: null };
+  const subs = new Set();
+  const tell = () => { for (const cb of subs) cb(auth.currentUser); };
+  const A = {
+    onAuthStateChanged(_auth, cb) { subs.add(cb); queueMicrotask(() => cb(auth.currentUser)); return () => subs.delete(cb); },
+    async signInWithCustomToken(_auth, t) { auth.currentUser = { uid: t.replace(/^tok-/, ''), email: null, isAnonymous: false }; tell(); },
+    async signOut() { auth.currentUser = null; tell(); },
+  };
+  return { A, auth };
 }
 const waitFor = async (fn, ms = 3000) => { const t = Date.now(); while (!fn()) { if (Date.now() - t > ms) throw new Error('timed out'); await new Promise(r => setTimeout(r, 20)); } };
-
+async function setup({ persisted = true } = {}) {
+  const f = fakeFirestore(), outbox = memoryOutbox(), { A, auth } = fakeAuth();
+  let up = true;
+  const base = { A, F: f.F, auth, db: f.db };
+  const s = await createSaving({ core, sdk: async () => base, store: outbox, storage: null, online: () => up, persist: async () => ({ supported: true, persisted }), openDb: async () => f.db });
+  const users = [];
+  s.onUser(u => users.push(u));
+  assert.deepEqual(await s.signIn({ method: 'token', code: 'tok-u1' }), { ok: true, reason: '' });
+  await waitFor(() => users.at(-1)?.uid === 'u1');
+  return { s, f, outbox, users, offline: v => { up = !v; f.server.mode = v ? 'down' : 'up'; } };
+}
 test('the engine and the update module are pinned to one exact version everywhere', () => {
-  assert.equal(SYNC_VERSION, '0.6.3');
-  assert.equal(UPDATE_VERSION, '0.2.0');
+  assert.equal(SYNC_VERSION, '1.5.2');
+  assert.equal(UPDATE_VERSION, '1.5.2');
+  assert.ok(FILES.length > 20 || process.env.APP_SYNC_DIR, 'the module files are listed');
   const sw = read('sw.js');
   for (const f of FILES) assert.ok(sw.includes(`'https://core.anawj.com/sync/${SYNC_VERSION}/${f}'`), `sw.js SHELL has sync ${f}`);
   assert.ok(sw.includes(`'https://core.anawj.com/update/${UPDATE_VERSION}/register.js'`), 'sw.js SHELL has register.js');
@@ -124,7 +150,7 @@ test('an answer sent offline is kept on the device, holds the reload and the sig
   await waitFor(() => f.server.docs.has('selection/2027/responses/' + ME));
   await waitFor(() => s.status().state === 'synced');
   assert.deepEqual(await s.signOut(), { ok: true });
-  assert.equal(f.server.terminated && f.server.cleared, true, 'forgetDevice cleared the SDK’s offline copy');
+  assert.equal(f.server.terminated && f.server.cleared, true, 'forget cleared the SDK’s offline copy');
   assert.equal(outbox.size(), 0, 'and the outbox');
 });
 
@@ -138,7 +164,7 @@ test('an answer the rules refuse (round closed) throws, is set aside, and nothin
   assert.equal(f.server.docs.size, 0);
 });
 
-test('a write sent straight to the SDK counts as unsent until it settles (otherPending)', async () => {
+test('a write sent straight to the SDK counts as unsent until it settles (track)', async () => {
   const { s } = await setup();
   s.heard();
   let done;
@@ -164,4 +190,29 @@ test('sign-out anyway (force) wipes the unsent answer; at-risk only while offlin
   assert.deepEqual(await s.signOut({ force: true }), { ok: true });
   assert.equal(outbox.size(), 0);
   assert.equal(KIND('2027'), 'responses@2027');
+});
+
+test('a new passcode on a device whose last guest left an answer unsent is refused, nothing wiped; it goes once sent', async () => {
+  const { s, f, outbox, users, offline } = await setup();
+  offline(true);
+  assert.deepEqual(await s.send('2027', answer(), 200), { state: 'waiting' });
+  // the next guest (a new uid) signs in on the same device
+  const r = await s.signIn({ method: 'token', code: 'tok-u2' });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'unsent');
+  assert.equal(s.blocked()?.reason, 'unsent');
+  assert.equal(users.at(-1), null, 'nobody signed in');
+  assert.equal(outbox.size(), 1, 'the first guest’s answer is still here');
+  assert.equal(f.server.cleared, false);
+  // the first guest comes back with signal: it sends, then the next guest is let in and the device wiped first
+  offline(false);
+  assert.deepEqual(await s.signIn({ method: 'token', code: 'tok-u1' }), { ok: true, reason: '' });
+  await waitFor(() => f.server.docs.has('selection/2027/responses/' + ME));
+  await waitFor(() => s.queue.pending() === 0);
+  assert.deepEqual(await s.signIn({ method: 'token', code: 'tok-u2' }), { ok: true, reason: '' });
+  await waitFor(() => users.at(-1)?.uid === 'u2');
+  assert.equal(f.server.cleared, true, 'the last guest’s offline copy went first');
+  assert.equal(outbox.size(), 0);
+  assert.deepEqual(await s.send('2027', answer('B', 'guest-u2')), { state: 'sent' });
+  assert.ok(f.server.docs.has('selection/2027/responses/guest-u2'));
 });

@@ -9,7 +9,8 @@ import { FIREBASE_CONFIG } from './firebase-config.js';
 import { createSaving } from './sync.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-const SYNC = 'https://core.anawj.com/sync/0.6.3/index.js';   // app-sync, one exact version (also in sw.js SHELL)
+// app-sync at one exact version: index.js and the app, auth and sync modules (also in sw.js SHELL)
+const CORE = 'https://core.anawj.com/sync/1.5.2/';
 const params = (() => { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } })();
 export const demo = params.has('demo');
 export const enabled = demo || !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
@@ -45,13 +46,15 @@ async function sdk() {
   fb = (async () => {
     const [app, auth, fs] = await Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-auth.js'), import(SDK + 'firebase-firestore.js')]);
     const a = app.initializeApp(FIREBASE_CONFIG);
+    // one object every part shares: app-sync puts a reopened db on it after a wipe, so docs reads db from it afresh
     return { app: a, auth: auth.getAuth(a), db: openDb(a, fs), A: auth, F: fs };
   })();
   fb.catch(() => { fb = null; });   // e.g. offline on first ever load: try again next time
   return fb;
 }
-function openDb(a, fs) {
-  try { return fs.initializeFirestore(a, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) }); }
+// memory: a copy for this page only (asked by app-sync after a wipe, when a persistent one can't be had)
+function openDb(a, fs, memory = false) {
+  try { return fs.initializeFirestore(a, { localCache: memory ? fs.memoryLocalCache() : fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) }); }
   catch (e) { console.warn('Offline cache unavailable; using memory only', e); return fs.getFirestore(a); }
 }
 // A write applies to the local cache at once but only settles when the server confirms: wait a little, then go on.
@@ -104,7 +107,10 @@ let saving = null;
 export function sending() {
   if (testHook) return Promise.resolve(testHook.saving);
   if (demo || !enabled) return Promise.resolve(null);
-  saving ||= (async () => createSaving({ AS: await import(SYNC), sdk: async () => { const s = await sdk(); return { A: s.A, F: s.F, auth: s.auth, get db() { return s.db; } }; } }))();
+  saving ||= (async () => {
+    const [AS, { createApp }, { auth }, { sync }] = await Promise.all(['index.js', 'app.js', 'auth.js', 'sync.js'].map(f => import(CORE + f)));
+    return createSaving({ core: { AS, createApp, auth, sync }, sdk, openDb: async memory => { const s = await sdk(); return openDb(s.app, s.F, memory); } });
+  })();
   saving.catch(() => { saving = null; });   // e.g. offline on first ever load: try again next time
   return saving;
 }
@@ -123,23 +129,28 @@ async function asUser(u) {
   return { email: 'guest-' + u.uid, name: 'Guest', uid: u.uid, guest: true, role };
 }
 
+// Who is signed in, from app-sync's auth module (it follows Firebase): after another account's data was wiped, and
+// null when that was refused (signInWithPasscode / signInAdmin say why). Without the engine (it could not load):
+// Firebase's own answers.
 export async function watchUser(cb) {
   if (demo) { demoCb = cb; cb(demoSignedOut ? null : demoUser(demoRole())); return; }
   if (!enabled) return;
   const { auth, A } = await sdk();
+  const sv = await sending().catch(e => { console.warn('Outbox unavailable', e); return null; });
+  if (sv) { sv.onUser(async u => cb(u ? await asUser(auth.currentUser?.uid === u.uid ? auth.currentUser : u) : null)); return; }
   A.getRedirectResult(auth).catch(e => console.warn('Redirect sign-in failed', e));
-  A.onAuthStateChanged(auth, async u => {
-    const user = await asUser(u);
-    // this person's answers not sent before a reload start going again
-    if (user) await sending().then(sv => sv?.activate(user.email)).catch(e => console.warn('Outbox unavailable', e));
-    cb(user);
-  });
+  A.onAuthStateChanged(auth, async u => cb(await asUser(u)));
 }
+// a sign-in refused because the last person's answers are still on this device (not sent): what to say
+const UNSENT = 'This device still has answers from the last person that are not sent yet. Connect to the internet and wait a moment, then try again.';
+const refused = r => { if (!r.ok && (r.reason === 'unsent' || r.reason === 'wipe')) throw new Error(UNSENT); };
 
 // Admins: Google, popup first; redirect when popups are blocked or unsupported (some home-screen apps).
 const REDIRECT_CODES = ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported', 'auth/cancelled-popup-request'];
 export async function signInAdmin() {
   if (demo) { demoSignedOut = false; setDemoRole('admin'); demoCb?.(demoUser('admin')); return; }
+  const sv = await sending().catch(() => null);
+  if (sv) return refused(await sv.signIn({ method: 'google' }));
   const { auth, A } = await sdk();
   const provider = new A.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
@@ -153,12 +164,14 @@ export async function signInWithPasscode(passcode) {
   const res = await fetch('/api/guest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ passcode }) });
   const b = await res.json().catch(() => ({}));
   if (!res.ok || !b.token) throw new Error(res.status === 401 ? 'That passcode isn’t right.' : res.status === 429 ? 'Too many tries. Wait a minute.' : b.error || 'Couldn’t sign in.');
+  const sv = await sending().catch(() => null);
+  if (sv) return refused(await sv.signIn({ method: 'token', code: b.token }));
   const { auth, A } = await sdk();
   await A.signInWithCustomToken(auth, b.token);
 }
 
 // Signing out also wipes this device's offline copy (a shared ward PC keeps nothing): the outbox and the SDK's cache
-// (app-sync forgetDevice). Refused while answers or other changes are not on the server yet, unless force.
+// (app-sync's auth.forget; a fresh copy is opened in its place). Refused while answers or other changes are not on the server yet, unless force.
 // -> { ok: true } or { ok: false, unsent: true }
 export async function signOut({ force = false } = {}) {
   if (demo) { demoSignedOut = true; demoCb?.(null); return { ok: true }; }
@@ -170,9 +183,7 @@ export async function signOut({ force = false } = {}) {
     s.db = openDb(s.app, s.F);
     return { ok: true };
   }
-  const r = await sv.signOut({ force, before: () => s.A.signOut(s.auth) });
-  if (r.ok) s.db = openDb(s.app, s.F);
-  return r;
+  return sv.signOut({ force });
 }
 
 // ---- roles of a Google sign-in ----

@@ -1,4 +1,4 @@
-// Residency applications offline support, on the shared update module (app-update 0.2.0, core.anawj.com/update/): it
+// Residency applications offline support, on the shared update module (app-sync's update module 1.5.2, core.anawj.com/update/): it
 // installs every SHELL file or nothing, and a new version waits (waitForGo) until the page says go, which it does only
 // when no one is typing or sending (js/app-update.js, canReload). The deploy stamps VERSION (tools/stamp-versions.mjs:
 // 'applicants-v1' becomes 'applicants-<date>-<hash>'); never change it by hand. Change the v<N> only when this file's own
@@ -30,28 +30,43 @@ const SHELL = [
   'https://design.anawj.com/v1/tokens.css',
   'https://design.anawj.com/v1/app.css',
   'https://design.anawj.com/v1/app.js',
-  // the sync engine (app-sync), one exact version: answers sent offline go only with it
-  'https://core.anawj.com/sync/0.6.3/index.js',
-  'https://core.anawj.com/sync/0.6.3/src/sync.js',
-  'https://core.anawj.com/sync/0.6.3/src/writes.js',
-  'https://core.anawj.com/sync/0.6.3/src/conflict.js',
-  'https://core.anawj.com/sync/0.6.3/src/store.js',
-  'https://core.anawj.com/sync/0.6.3/src/outbox.js',
-  'https://core.anawj.com/sync/0.6.3/src/watchdog.js',
-  'https://core.anawj.com/sync/0.6.3/src/persist.js',
-  'https://core.anawj.com/sync/0.6.3/src/status.js',
-  'https://core.anawj.com/sync/0.6.3/src/forget.js',
-  'https://core.anawj.com/sync/0.6.3/src/firestore.js',
-  'https://core.anawj.com/sync/0.6.3/src/registry.js',
-  'https://core.anawj.com/sync/0.6.3/src/report.js',
-  'https://core.anawj.com/sync/0.6.3/src/app.js',
+  // the sync engine (app-sync: index.js and the app, auth and sync modules), one exact version: answers sent offline go only with it
+  'https://core.anawj.com/sync/1.5.2/app.js',
+  'https://core.anawj.com/sync/1.5.2/auth.js',
+  'https://core.anawj.com/sync/1.5.2/index.js',
+  'https://core.anawj.com/sync/1.5.2/src/auth.js',
+  'https://core.anawj.com/sync/1.5.2/src/cache.js',
+  'https://core.anawj.com/sync/1.5.2/src/conflict.js',
+  'https://core.anawj.com/sync/1.5.2/src/core.js',
+  'https://core.anawj.com/sync/1.5.2/src/firestore.js',
+  'https://core.anawj.com/sync/1.5.2/src/forget.js',
+  'https://core.anawj.com/sync/1.5.2/src/kinds.js',
+  'https://core.anawj.com/sync/1.5.2/src/module-sync.js',
+  'https://core.anawj.com/sync/1.5.2/src/outbox.js',
+  'https://core.anawj.com/sync/1.5.2/src/persist.js',
+  'https://core.anawj.com/sync/1.5.2/src/registry.js',
+  'https://core.anawj.com/sync/1.5.2/src/replace.js',
+  'https://core.anawj.com/sync/1.5.2/src/report.js',
+  'https://core.anawj.com/sync/1.5.2/src/runner.js',
+  'https://core.anawj.com/sync/1.5.2/src/signin/anonymous.js',
+  'https://core.anawj.com/sync/1.5.2/src/signin/email-link.js',
+  'https://core.anawj.com/sync/1.5.2/src/signin/passcode.js',
+  'https://core.anawj.com/sync/1.5.2/src/signin/password.js',
+  'https://core.anawj.com/sync/1.5.2/src/status.js',
+  'https://core.anawj.com/sync/1.5.2/src/store.js',
+  'https://core.anawj.com/sync/1.5.2/src/sync.js',
+  'https://core.anawj.com/sync/1.5.2/src/user.js',
+  'https://core.anawj.com/sync/1.5.2/src/view.js',
+  'https://core.anawj.com/sync/1.5.2/src/watchdog.js',
+  'https://core.anawj.com/sync/1.5.2/src/writes.js',
+  'https://core.anawj.com/sync/1.5.2/sync.js',
   // the page half of the update module (register.js), one exact version: the page starts it offline too
-  'https://core.anawj.com/update/0.2.0/register.js',
+  'https://core.anawj.com/update/1.5.2/register.js',
 ];
 
 const MANIFEST = {};
 
-importScripts('https://core.anawj.com/update/0.2.0/sw-core.js');
+importScripts('https://core.anawj.com/update/1.5.2/sw-core.js');
 AppUpdate.init({
   app: 'applicants', version: VERSION, shell: SHELL, manifest: MANIFEST, waitForGo: true,
   // "Get the latest version" checks for signal by fetching sw.js; the passcode sign-in is never cached
