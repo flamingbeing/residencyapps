@@ -149,7 +149,7 @@ function account() {
     : codeRole() === 'committee' ? ['Committee', 'Signed in with the committee passcode: you read the results.']
     : [S.user.name, S.user.email + (isAdmin() ? ' · admin' : S.roles.committee ? ' · selection committee' : '')];
   // the app kit's look, light / dark, density and Glass or Solid, kept on this device (drawn on first open)
-  const lookBox = h('div', { class: 'e-look' });
+  const lookBox = h('div');
   const look = h('details', { class: 'sl-more', ontoggle: () => theme.then(t => { if (t && !lookBox.childElementCount) t.themeSwitch(lookBox); }) },
     h('summary', {}, 'Look on this device'), lookBox);
   const m = modal('Account', [

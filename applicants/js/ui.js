@@ -4,9 +4,9 @@
 // The app kit's theme (app-ui @core/theme, one exact version; sw.js keeps it offline): look A unless this device picks
 // another under Account, NUHS navy as the accent, light / dark following the phone unless picked. import() so a
 // blocked core.anawj.com leaves the NUHS kit's own light look.
-export const KIT = 'https://core.anawj.com/ui/1.0.0-rc.22/';
+export const KIT = 'https://core.anawj.com/ui/1.0.0-rc.27/';
 export const theme = typeof document === 'undefined' ? Promise.resolve(null)
-  : import(KIT + 'theme/index.js').then(t => { t.applyTheme({ accent: '#002f6c' }); return t; }).catch(() => null);
+  : import(KIT + 'theme/index.js').then(t => { t.applyTheme({ accent: '#002f6c', surface: 'cool' }); return t; }).catch(() => null);
 
 // h('p', { class: 'x', onclick }, 'text', child): one element; null and false children are skipped
 export function h(tag, attrs = {}, ...kids) {
