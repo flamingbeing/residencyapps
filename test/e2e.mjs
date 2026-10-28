@@ -105,6 +105,17 @@ await page.getByRole('button', { name: 'Send', exact: true }).click();
 await page.getByText('Sent. Thank you.').waitFor();
 await axe('done');
 
+// 4b. The app kit's look sits under Account (look A by default); picking Dark here keeps it on this device, so the
+// screens from here on are checked in dark
+assert.equal(await page.evaluate(() => document.documentElement.dataset.look), 'a', 'the app kit painted look A');
+await page.getByRole('button', { name: 'Account' }).click();
+await page.locator('dialog[open] summary', { hasText: 'Look on this device' }).click();
+await page.locator('dialog[open] #theme-pick').selectOption('dark');
+await axe('look'); await shot('4-look');
+await page.getByRole('button', { name: 'Close' }).click();
+assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+await axe('done, dark'); await shot('4-done-dark');
+
 // 5. An admin (Google sign-in) lands on the results: means, comments, CSV
 await page.getByRole('button', { name: 'Account' }).click();
 await page.locator('dialog[open] select').selectOption('admin');

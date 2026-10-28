@@ -121,6 +121,15 @@ test('the engine and the update module are pinned to one exact version everywher
   assert.equal(new Set([...(sw + read('js/cloud.js')).matchAll(/core\.anawj\.com\/sync\/(\d+\.\d+\.\d+)\//g)].map(m => m[1])).size, 1, 'one sync version');
 });
 
+test('the app kit (app-ui) is pinned to one exact version and kept offline', () => {
+  const sw = read('sw.js'), page = read('index.html') + read('js/ui.js');
+  const versions = new Set([...(sw + page).matchAll(/core\.anawj\.com\/ui\/([^/'"]+)\//g)].map(m => m[1]));
+  assert.deepEqual([...versions], ['1.0.0-rc.22'], 'one ui version');
+  for (const f of ['theme/early.js', 'theme/theme.css', 'theme/glass.css', 'ui/layout.css', 'theme/index.js', 'theme/switch.js', 'theme/looks/a.js'])
+    assert.ok(sw.includes(`'https://core.anawj.com/ui/1.0.0-rc.22/${f}'`), `sw.js SHELL has ui ${f}`);
+  assert.match(sw, /\(sync\|update\|ui\)/, 'the pinned rule covers the kit');
+});
+
 test('an answer sent online reaches the server with both stamps, and the status says synced once the server is heard', async () => {
   const { s, f } = await setup();
   assert.equal(s.status().state, 'unknown', 'not synced on the device’s word alone');

@@ -7,7 +7,7 @@
 // With ?demo: made-up applicants, a demo sign-in per role, and nothing leaves the browser.
 
 import * as cloud from './cloud.js';
-import { h, fill, toast, modal, confirmBox, download, empty, applyTheme, errText, initials, debounce, segment } from './ui.js';
+import { h, fill, toast, modal, confirmBox, download, empty, theme, errText, initials, debounce, segment } from './ui.js';
 import {
   INTRO, SCALE, SUGGESTED_COMMENTS, DEFAULT_QUESTIONS, MAX_QUESTIONS, parseNames, cleanRound, cleanQuestions, encodeRound, readRoundText, cleanAnswers, blank, statusOf,
   progress, nextUnanswered, warnings, formBody, formUrl, answersText, summary, resultsCSV, demoRound, matchPhotoFile, photoSrc, canMirror, scaleQuestions, hasAnswer,
@@ -20,7 +20,6 @@ import { startUpdates, retryUpdate } from './app-update.js';
 // who is signed in: { email, name, uid, guest?, role? } (cloud.js), and a Google sign-in's { admin, committee }
 const S = { user: null, roles: { admin: false, committee: false } };
 
-applyTheme();
 if (cloud.demo && /[?&]demo=reset/.test(location.search)) store.resetDemo();   // the demo goes back to its made-up start
 
 const app = document.getElementById('app');
@@ -149,10 +148,15 @@ function account() {
     : codeRole() === 'setup' ? ['Set-up', 'Signed in with the set-up passcode: the round, its photos and questions.']
     : codeRole() === 'committee' ? ['Committee', 'Signed in with the committee passcode: you read the results.']
     : [S.user.name, S.user.email + (isAdmin() ? ' · admin' : S.roles.committee ? ' · selection committee' : '')];
+  // the app kit's look, light / dark, density and Glass or Solid, kept on this device (drawn on first open)
+  const lookBox = h('div', { class: 'e-look' });
+  const look = h('details', { class: 'sl-more', ontoggle: () => theme.then(t => { if (t && !lookBox.childElementCount) t.themeSwitch(lookBox); }) },
+    h('summary', {}, 'Look on this device'), lookBox);
   const m = modal('Account', [
     h('p', {}, who[0], h('br'), h('span', { class: 'e-small' }, who[1])),
     cloud.demo ? h('label', { class: 'e-label' }, 'Demo role', h('select', { class: 'e-select', onchange: e => { cloud.setDemoRole(e.target.value); location.reload(); } },
       Object.entries(cloud.DEMO_ROLES).map(([r, label]) => h('option', { value: r, selected: cloud.demoRole() === r }, label)))) : null,
+    look,
     h('div', { class: 'e-actions' },
       round && canAnswer() ? h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: async () => {
         if (!await confirmBox('Clear my answers?', 'This removes your scores and comments from this device. If you haven’t sent them, they’re gone.', 'Clear', true)) return;

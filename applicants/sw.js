@@ -4,7 +4,7 @@
 // 'applicants-v1' becomes 'applicants-<date>-<hash>'); never change it by hand. Change the v<N> only when this file's own
 // logic changes.
 //
-// The app's own files, the design kit (design.anawj.com/v1/), the sync engine and the update module are in SHELL; the
+// The app's own files, the design kits (design.anawj.com/v1/ and the app kit, app-ui), the sync engine and the update module are in SHELL; the
 // Firebase SDK (gstatic, one exact version) is kept once fetched. The passcode sign-in (/api/), Firebase's sign-in pages
 // (/__/), sw.js itself and everything else (Firestore, Google) always go to the network.
 const VERSION = 'applicants-v1';
@@ -30,6 +30,26 @@ const SHELL = [
   'https://design.anawj.com/v1/tokens.css',
   'https://design.anawj.com/v1/app.css',
   'https://design.anawj.com/v1/app.js',
+  // the app kit (app-ui: early.js, the theme CSS and the Look switch with its imports), one exact version: without it the app opens offline in the NUHS kit light look only
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/early.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/theme.css',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/glass.css',
+  'https://core.anawj.com/ui/1.0.0-rc.22/ui/layout.css',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/index.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/choice.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/colour.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/grid.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/guard.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/looks.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/motion.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/palette-css.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/presets.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/schema.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/switch.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/looks/a.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/looks/b.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/looks/c.js',
+  'https://core.anawj.com/ui/1.0.0-rc.22/theme/looks/d.js',
   // the sync engine (app-sync: index.js and the app, auth and sync modules), one exact version: answers sent offline go only with it
   'https://core.anawj.com/sync/1.5.2/app.js',
   'https://core.anawj.com/sync/1.5.2/auth.js',
@@ -75,6 +95,6 @@ AppUpdate.init({
     // the kit's /v1/ changes compatibly: answer from the cache, refresh in the background
     { name: 'kit', match: 'https://design.anawj.com/v1/', strategy: 'stale-while-revalidate', max: 40 },
     // exact versions (the address carries it): never change
-    { name: 'pinned', match: /^https:\/\/core\.anawj\.com\/(sync|update)\/\d+\.\d+\.\d+\//, strategy: 'cache-first', max: 40 },
+    { name: 'pinned', match: /^https:\/\/core\.anawj\.com\/(sync|update|ui)\/\d+\.\d+\.\d+(-rc\.\d+)?\//, strategy: 'cache-first', max: 40 },
   ],
 });
