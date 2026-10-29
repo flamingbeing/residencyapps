@@ -247,6 +247,25 @@ await other.getByRole('button', { name: /Zoë Tan/ }).waitFor();
 assert.equal(await other.locator('.sl-grid .sl-tile').count(), 2, 'repeated names are dropped');
 await other.close();
 
+// 11. Back with tabs (the kit's tabBack): switching tabs adds at most one Back step; Back goes to the first tab, then leaves
+const nav = await ctx.newPage();
+nav.on('pageerror', e => errors.push(String(e)));
+await nav.goto('about:blank');
+await nav.goto(BASE + '?demo=admin');
+await nav.getByRole('tab', { name: 'Results', selected: true }).waitFor();
+await nav.waitForFunction(() => !!document.querySelector('[role=tab]'));
+const len0 = await nav.evaluate(() => history.length);
+for (const t of ['Set up', 'Results', 'Set up', 'Results', 'Set up']) {
+  await nav.getByRole('tab', { name: t }).click();
+  await nav.getByRole('tab', { name: t, selected: true }).waitFor();
+}
+assert.ok(await nav.evaluate(() => history.length) - len0 <= 1, 'tabs add at most one Back step');
+await nav.goBack();
+await nav.getByRole('tab', { name: 'Results', selected: true }).waitFor();
+await nav.goBack();
+assert.equal(nav.url(), 'about:blank', 'Back on the first tab leaves the app');
+await nav.close();
+
 assert.deepEqual(posted, [], 'the demo never reaches the Form or Firebase');
 assert.deepEqual(errors, []);
 await b.close();

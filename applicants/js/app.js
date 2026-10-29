@@ -7,7 +7,7 @@
 // With ?demo: made-up applicants, a demo sign-in per role, and nothing leaves the browser.
 
 import * as cloud from './cloud.js';
-import { h, fill, toast, modal, confirmBox, download, empty, theme, errText, initials, debounce, segment } from './ui.js';
+import { h, fill, toast, modal, confirmBox, download, empty, theme, errText, initials, debounce, segment, tabBackKit } from './ui.js';
 import {
   INTRO, SCALE, SUGGESTED_COMMENTS, DEFAULT_QUESTIONS, MAX_QUESTIONS, parseNames, cleanRound, cleanQuestions, encodeRound, readRoundText, cleanAnswers, blank, statusOf,
   progress, nextUnanswered, warnings, formBody, formUrl, answersText, summary, resultsCSV, demoRound, matchPhotoFile, photoSrc, canMirror, scaleQuestions, hasAnswer,
@@ -656,8 +656,22 @@ async function resultsScreen() {
 // ---------- render and boot ----------
 
 let seq = 0;
-const tabs = cur => (isStaff() || canResults())
-  ? segment([['home', 'Feedback', canAnswer()], ['results', 'Results', canResults()], ['setup', 'Set up', isStaff()]].filter(t => t[2]).map(([id, label]) => ({ id, label })), cur, id => go(id === 'home' ? '#' : '#' + id)) : null;
+// Back with tabs, as Android apps do it: switching tabs adds no Back steps; Back on another tab goes to the first tab,
+// and Back on the first tab leaves the app. The kit moves the address; the hashchange from Back draws the first tab.
+let tabBk = null;
+tabBackKit.then(m => { if (m) tabBk = m.tabBack({ history, events: window, onFirst: () => {} }); });
+const tabs = cur => {
+  if (!isStaff() && !canResults()) return null;
+  const list = [['home', 'Feedback', canAnswer()], ['results', 'Results', canResults()], ['setup', 'Set up', isStaff()]].filter(t => t[2]).map(([id, label]) => ({ id, label }));
+  return segment(list, cur, id => {
+    const url = id === 'home' ? '#' : '#' + id, first = id === list[0].id;
+    if (id === cur) return;
+    if (!tabBk) return go(url);
+    const back = first && tabBk.away();   // went() goes back; the hashchange then draws it
+    tabBk.went(first, url);
+    if (!back) render();
+  });
+};
 async function render() {
   const n = ++seq;
   if (!S.user) return;

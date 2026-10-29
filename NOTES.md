@@ -70,7 +70,7 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
   reloads into it only when no one is typing, no sheet is open and nothing is sending. Both versions are exact pins, the
   same in `sw.js` SHELL, `js/cloud.js` and `js/app-update.js` (`test/sync.test.mjs` checks). `?nosw` runs without it.
 - **Look: two kits** (`index.html`, `style.css`): the NUHS kit (`design.anawj.com/v1/`: app.css, app.js, the `.a-*`
-  classes) still draws every screen, and the app kit (app-ui 1.0.0-rc.27 at `core.anawj.com/ui/`: early.js, theme.css,
+  classes) still draws every screen, and the app kit (app-ui 1.0.0-rc.42 at `core.anawj.com/ui/`: early.js, theme.css,
   `theme/index.js` in `js/ui.js`, cool ground; not glass.css or layout.css, which style bare dialogs and buttons) sets the colours: once it has painted (`html[data-look]`) the
   `--a-*` tokens come from its tokens. Look A, NUHS navy accent, light / dark following the phone; each device can change
   look, theme, density and Glass or Solid under Account, "Look on this device". The kit files are in `sw.js` SHELL at
