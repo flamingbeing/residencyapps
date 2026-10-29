@@ -124,9 +124,9 @@ test('the engine and the update module are pinned to one exact version everywher
 test('the app kit (app-ui) is pinned to one exact version and kept offline', () => {
   const sw = read('sw.js'), page = read('index.html') + read('js/ui.js');
   const versions = new Set([...(sw + page).matchAll(/core\.anawj\.com\/ui\/([^/'"]+)\//g)].map(m => m[1]));
-  assert.deepEqual([...versions], ['1.0.0-rc.27'], 'one ui version');
+  assert.deepEqual([...versions], ['1.0.0-rc.42'], 'one ui version');
   for (const f of ['theme/early.js', 'theme/theme.css', 'theme/index.js', 'theme/switch.js', 'theme/looks/a.js', 'theme/looks/e.js'])
-    assert.ok(sw.includes(`'https://core.anawj.com/ui/1.0.0-rc.27/${f}'`), `sw.js SHELL has ui ${f}`);
+    assert.ok(sw.includes(`'https://core.anawj.com/ui/1.0.0-rc.42/${f}'`), `sw.js SHELL has ui ${f}`);
   assert.doesNotMatch(sw + page, /core\.anawj\.com\/ui\/[^/]+\/(theme\/glass|ui\/layout)\.css/, 'the NUHS kit draws the bars and screens: no app-kit glass or layout sheet');
   assert.match(sw, /\(sync\|update\|ui\)/, 'the pinned rule covers the kit');
 });
