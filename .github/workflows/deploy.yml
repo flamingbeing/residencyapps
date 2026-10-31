@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   deploy:
-    uses: flamingbeing/app-devkit/.github/workflows/deploy-worker.yml@v1.1.0
+    uses: flamingbeing/app-devkit/.github/workflows/deploy-worker.yml@v1.13.7
     with:
       stamp-command: if [ -f tools/stamp-versions.mjs ]; then node tools/stamp-versions.mjs; fi
     secrets: inherit
