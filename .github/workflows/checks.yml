@@ -21,8 +21,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: flamingbeing/app-devkit/setup-node@v1.1.0
-      - uses: flamingbeing/app-devkit/setup-tools@v1.6.0
+      - uses: flamingbeing/app-devkit/setup-node@v1.13.7
+      - uses: flamingbeing/app-devkit/setup-tools@v1.13.7
       - name: Repo check (and Worker tests)
         run: node .devkit/tools/check.mjs
       - name: Model tests
@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: flamingbeing/app-devkit/setup-node@v1.1.0
+      - uses: flamingbeing/app-devkit/setup-node@v1.13.7
       - name: Cache rules test tools and emulator
         uses: actions/cache@v4
         with:
@@ -55,10 +55,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: flamingbeing/app-devkit/setup-node@v1.1.0
+      - uses: flamingbeing/app-devkit/setup-node@v1.13.7
       - name: Install Playwright and axe
         run: npm install -g playwright@1.56.1 axe-core@4
-      - uses: flamingbeing/app-devkit/setup-browser@v1.1.0
+      - uses: flamingbeing/app-devkit/setup-browser@v1.13.7
         with:
           playwright-version: '1.56.1'
           devkit-dir: ''
