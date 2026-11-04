@@ -10,6 +10,8 @@
 1. An alert for project `residencyapps` (the daily backup runs since 23 Oct).
 
 ## Recently done
+- 4 Nov 2026: app-ui 1.0.0-rc.42 → rc.90; signed-out page is the kit's sign-in screen (passcode, optional name, Admin
+  sign-in); tab taps wait for the kit's Back to load.
 - 25 Oct 2026: `firestore.rules` (accepts both passcode claim shapes) deployed; the released ruleset matches main. The Worker
   now signs passcode tokens with app-devkit's `custom-token.js` (#14).
 - 25 Oct 2026: app-sync 0.6.0 → 0.6.3 (pin only: cloud.js, sw.js, test pin; answers use `backend.merge`, so held saves
