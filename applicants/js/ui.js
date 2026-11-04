@@ -4,7 +4,7 @@
 // The app kit's theme (app-ui @core/theme, one exact version; sw.js keeps it offline): look A unless this device picks
 // another under Account, NUHS navy as the accent, light / dark following the phone unless picked. import() so a
 // blocked core.anawj.com leaves the NUHS kit's own light look.
-export const KIT = 'https://core.anawj.com/ui/1.0.0-rc.89/';
+export const KIT = 'https://core.anawj.com/ui/1.0.0-rc.90/';
 export const theme = typeof document === 'undefined' ? Promise.resolve(null)
   : import(KIT + 'theme/index.js').then(t => { t.applyTheme({ accent: '#002f6c', surface: 'cool' }); return t; }).catch(() => null);
 // The kit's Back with tabs (ui/tab-back.js); null when core.anawj.com is blocked, and tabs then add Back steps as before
