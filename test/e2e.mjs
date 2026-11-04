@@ -51,17 +51,24 @@ const axe = async (label, pg = page) => {
 const shot = async name => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, name + '.png'), fullPage: true }); } };
 const tabs = async () => page.getByRole('tab').allTextContents();
 
-// 0. Signed out: the passcode is the way in; Google is tucked away for admins
+// 0. Signed out: the kit's sign-in screen; the passcode (name optional) is the way in, Google only under Admin sign-in
 await page.goto(BASE + '?demo=reset');
 await page.getByRole('button', { name: /Alex Demo/ }).waitFor();
 await page.getByRole('button', { name: 'Account' }).click();
 await page.getByRole('button', { name: 'Sign out' }).click();
 await page.locator('#gp').waitFor();
 assert.match(await page.textContent('main'), /passcode you were given/);
-assert.ok(!(await page.getByRole('button', { name: 'Sign in with Google' }).isVisible()), 'Google sign-in sits under Admin sign-in');
+assert.ok(await page.locator('.ui-signin').isVisible(), 'the kit sign-in screen covers the page');
+assert.ok(await page.locator('#gp-name').isVisible(), 'an optional name field');
+assert.ok(await page.locator('#admin-sign-in').isVisible(), 'Admin sign-in is offered');
+assert.equal(await page.locator('#sign-in').count(), 0, 'no Google button for everyone: admins only, under Admin sign-in');
+assert.ok(!(await page.locator('#forget').isVisible()), 'nothing to forget: sign-out already wiped this device');
 await axe('sign-in'); await shot('0-sign-in');
 await page.locator('#gp').fill('anything');
+await page.locator('#gp-name').fill('Dr Demo');
 await page.getByRole('button', { name: 'Continue' }).click();
+await page.locator('.ui-signin').waitFor({ state: 'detached' });
+assert.equal(await page.locator('link[data-signin]').count(), 0, 'the kit sheet goes with the sign-in screen');
 
 // 1. A guest: eight made-up applicants with passport-style photos, no staff tabs
 await page.getByRole('button', { name: /Alex Demo/ }).waitFor();
@@ -99,7 +106,8 @@ await page.getByText('Worth a look (you can still send):').waitFor();
 const review = await page.textContent('main');
 assert.match(review, /3 of 8 answered/);
 assert.match(review, /Dani Placeholder not answered yet/);
-assert.equal(await page.inputValue('#sl-name'), '');
+assert.equal(await page.inputValue('#sl-name'), 'Dr Demo', 'the name given at sign-in fills it in');
+await page.locator('#sl-name').fill('');   // and blank still sends as Anonymous
 await axe('review'); await shot('3-review');
 await page.getByRole('button', { name: 'Send', exact: true }).click();
 await page.getByText('Sent. Thank you.').waitFor();

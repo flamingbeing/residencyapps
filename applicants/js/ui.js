@@ -4,11 +4,28 @@
 // The app kit's theme (app-ui @core/theme, one exact version; sw.js keeps it offline): look A unless this device picks
 // another under Account, NUHS navy as the accent, light / dark following the phone unless picked. import() so a
 // blocked core.anawj.com leaves the NUHS kit's own light look.
-export const KIT = 'https://core.anawj.com/ui/1.0.0-rc.42/';
+export const KIT = 'https://core.anawj.com/ui/1.0.0-rc.89/';
 export const theme = typeof document === 'undefined' ? Promise.resolve(null)
   : import(KIT + 'theme/index.js').then(t => { t.applyTheme({ accent: '#002f6c', surface: 'cool' }); return t; }).catch(() => null);
 // The kit's Back with tabs (ui/tab-back.js); null when core.anawj.com is blocked, and tabs then add Back steps as before
 export const tabBackKit = typeof window === 'undefined' ? Promise.resolve(null) : import(KIT + 'ui/tab-back.js').catch(() => null);
+// The kit's sign-in screen (ui/sign-in-screen.js) with its sheet (ui/ui.css). The sheet loads only while signed out
+// (it also styles bare dialogs, which would touch the NUHS sheets), just before app.css so the NUHS classes win on ties;
+// the returned function takes it away again. null when core.anawj.com is blocked: the page draws a plain card instead.
+export async function signInKit() {
+  if (typeof window === 'undefined') return null;
+  const mod = await import(KIT + 'ui/sign-in-screen.js').catch(() => null);
+  if (!mod) return null;
+  let link = /** @type {HTMLLinkElement | null} */ (document.querySelector('link[data-signin]'));
+  if (!link) {
+    link = h('link', { rel: 'stylesheet', href: KIT + 'ui/ui.css', 'data-signin': true });
+    const before = document.querySelector('link[href$="/v1/app.css"]');
+    before ? before.before(link) : document.head.append(link);
+    // drawn once the sheet is in (or after a second without it), so the screen never shows unstyled
+    await new Promise(ok => { link.addEventListener('load', ok); link.addEventListener('error', ok); setTimeout(ok, 1000); });
+  }
+  return { signInScreen: mod.signInScreen, done: () => document.querySelector('link[data-signin]')?.remove() };
+}
 
 // h('p', { class: 'x', onclick }, 'text', child): one element; null and false children are skipped
 export function h(tag, attrs = {}, ...kids) {

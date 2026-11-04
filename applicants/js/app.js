@@ -7,7 +7,7 @@
 // With ?demo: made-up applicants, a demo sign-in per role, and nothing leaves the browser.
 
 import * as cloud from './cloud.js';
-import { h, fill, toast, modal, confirmBox, download, empty, theme, errText, initials, debounce, segment, tabBackKit } from './ui.js';
+import { h, fill, toast, modal, confirmBox, download, empty, theme, errText, initials, debounce, segment, tabBackKit, signInKit } from './ui.js';
 import {
   INTRO, SCALE, SUGGESTED_COMMENTS, DEFAULT_QUESTIONS, MAX_QUESTIONS, parseNames, cleanRound, cleanQuestions, encodeRound, readRoundText, cleanAnswers, blank, statusOf,
   progress, nextUnanswered, warnings, formBody, formUrl, answersText, summary, resultsCSV, demoRound, matchPhotoFile, photoSrc, canMirror, scaleQuestions, hasAnswer,
@@ -140,6 +140,7 @@ async function signOutNow() {
     if (!await confirmBox('Not sent yet', 'Some of your changes haven’t reached the server yet (no signal?). Stay signed in until the status at the top says Synced, or sign out and lose them.', 'Sign out anyway', true)) return;
     r = await cloud.signOut({ force: true });
   }
+  keepName('');   // the optional name goes with the person
   if (!cloud.demo) location.reload();
 }
 
@@ -282,7 +283,7 @@ function reviewScreen() {
   const p = progress(round, answers);
   const w = warnings(round, answers);
   const open = isOpen();
-  const nameIn = h('input', { class: 'e-input', id: 'sl-name', autocomplete: 'name', value: isGuest() ? '' : S.user.name || '', placeholder: isGuest() ? 'Optional: leave blank to stay anonymous' : '', maxlength: 120 });
+  const nameIn = h('input', { class: 'e-input', id: 'sl-name', autocomplete: 'name', value: isGuest() ? signInName() : S.user.name || '', placeholder: isGuest() ? 'Optional: leave blank to stay anonymous' : '', maxlength: 120 });
   const status = h('p', { class: 'e-small', 'aria-live': 'polite' });
   const send = h('button', { class: 'a-btn e-go', type: 'button', disabled: !open }, sent ? 'Send again' : 'Send');
   send.onclick = async () => {
@@ -663,9 +664,10 @@ tabBackKit.then(m => { if (m) tabBk = m.tabBack({ history, events: window, onFir
 const tabs = cur => {
   if (!isStaff() && !canResults()) return null;
   const list = [['home', 'Feedback', canAnswer()], ['results', 'Results', canResults()], ['setup', 'Set up', isStaff()]].filter(t => t[2]).map(([id, label]) => ({ id, label }));
-  return segment(list, cur, id => {
+  return segment(list, cur, async id => {
     const url = id === 'home' ? '#' : '#' + id, first = id === list[0].id;
     if (id === cur) return;
+    await tabBackKit;   // a tap before the kit's Back has loaded waits for it (else that tab would add a Back step)
     if (!tabBk) return go(url);
     const back = first && tabBk.away();   // went() goes back; the hashchange then draws it
     tabBk.went(first, url);
@@ -697,27 +699,54 @@ async function render() {
 window.addEventListener('hashchange', () => render());
 
 // Everyone signs in with a passcode; the Worker (worker/guest.js) checks it and hands back a sign-in for that role (rules:
-// isGuest, isSetupCode, isCommitteeCode). Admins use Google, below.
-function signInScreen() {
+// isGuest, isSetupCode, isCommitteeCode). Admins use Google ("Admin sign-in"). The kit's sign-in screen (app-ui
+// signInScreen) covers the page; a plain card when core.anawj.com is blocked. The optional name is kept for this tab
+// only (sessionStorage, cleared at sign-out) and fills in "Your name" on Review and send.
+const NAME_KEY = `${NS}-name`;
+const signInName = () => { try { return sessionStorage.getItem(NAME_KEY) || ''; } catch { return ''; } };
+const keepName = v => { try { v ? sessionStorage.setItem(NAME_KEY, v) : sessionStorage.removeItem(NAME_KEY); } catch {} };
+let leaveSignIn = () => {};
+async function signedOut() {
   header('NUHS Residency Applications');
-  const code = h('input', { class: 'e-input', id: 'gp', type: 'password', autocomplete: 'off', 'aria-label': 'Passcode', placeholder: 'Passcode' });
-  const go2 = h('button', { class: 'a-btn', type: 'submit' }, 'Continue');
-  fill(app, h('section', { class: 'e-card', style: 'max-width:520px;margin:0 auto' },
-    h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'NUHS Residency Applications'),
-    h('p', {}, 'Confidential feedback on residency applicants. Sign in with the passcode you were given; your name is optional.'),
-    h('form', { onsubmit: async e => {
-      e.preventDefault(); if (!code.value.trim()) return; go2.disabled = true;
-      try { await cloud.signInWithPasscode(code.value.trim()); } catch (err) { toast(errText(err)); go2.disabled = false; }
-    } }, code, h('div', { class: 'e-actions' }, go2)),
-    h('details', { class: 'sl-more', style: 'margin-top:16px' }, h('summary', {}, 'Admin sign-in'),
-      h('p', { class: 'e-small' }, 'For the app’s admins and the selection committee: sign in with your Google account.'),
-      h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: async () => { try { await cloud.signInAdmin(); } catch (e) { toast('Sign-in failed. ' + errText(e)); } } }, 'Sign in with Google')),
-    cloud.demo ? h('p', { class: 'e-small' }, 'Demo: made-up applicants, kept only in this browser. Any passcode works.') : null));
+  const n = ++seq;
+  const kit = await signInKit();
+  if (n !== seq || S.user) { kit?.done(); return; }
+  const cls = c => kit ? null : c;   // the kit screen styles its own fields; the plain card uses the NUHS classes
+  const code = h('input', { class: cls('e-input'), id: 'gp', type: 'password', autocomplete: 'off', 'aria-label': 'Passcode', placeholder: 'Passcode' });
+  const nameIn = h('input', { class: cls('e-input'), id: 'gp-name', autocomplete: 'name', maxlength: 120, value: signInName(), 'aria-label': 'Your name (optional)', placeholder: 'Your name (optional)' });
+  const err = h('p', { id: 'gp-error', class: kit ? 'ui-error' : 'e-small', role: 'alert' });
+  const go2 = h('button', { class: cls('a-btn'), type: 'submit' }, 'Continue');
+  const form = h('form', { onsubmit: async e => {
+    e.preventDefault(); if (!code.value.trim()) return; go2.disabled = true; err.textContent = '';
+    keepName(nameIn.value.trim());
+    try { await cloud.signInWithPasscode(code.value.trim()); } catch (x) { err.textContent = errText(x); go2.disabled = false; }
+  } }, code, nameIn, go2, err);
+  const admin = async () => { err.textContent = ''; try { await cloud.signInAdmin(); } catch (e) { err.textContent = 'Sign-in failed. ' + errText(e); } };
+  const tagline = 'Confidential feedback on residency applicants.';
+  const note = 'Sign in with the passcode you were given; your name is optional.'
+    + (cloud.demo ? ' Demo: made-up applicants, kept only in this browser. Any passcode works.' : '');
+  if (!kit) {
+    fill(app, h('section', { class: 'e-card', style: 'max-width:520px;margin:0 auto' },
+      h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'NUHS Residency Applications'), h('p', {}, tagline), form,
+      h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted', type: 'button', id: 'admin-sign-in', onclick: admin }, 'Admin sign-in')),
+      h('p', { class: 'e-small' }, note)));
+    return;
+  }
+  fill(app);
+  const bar = document.querySelector('header.e-appbar');
+  if (bar) bar.hidden = true;   // the screen is the whole page: no bar above it
+  // passcode accounts: signing out already wipes this device's copy, so there is never one to forget
+  const stop = kit.signInScreen(app, {
+    name: 'NUHS Residency Applications', tagline, icon: 'icons/icon.svg', accent: '#002f6c',
+    fields: form, more: [{ label: 'Admin sign-in', id: 'admin-sign-in', onTap: admin }], note, holdsCopy: () => false,
+  });
+  leaveSignIn = () => { stop(); kit.done(); if (bar) bar.hidden = false; leaveSignIn = () => {}; };
 }
 
 cloud.watchUser(async u => {
   S.user = u;
-  if (!u) { S.roles = { admin: false, committee: false }; signInScreen(); return; }
+  if (!u) { S.roles = { admin: false, committee: false }; signedOut(); return; }
+  leaveSignIn();
   try { S.roles = await cloud.getRoles(u); } catch (e) { S.roles = { admin: false, committee: false }; toast('Couldn’t check your access. ' + errText(e)); }
   await loadRound(); await loadMine();
   render();

@@ -70,11 +70,16 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
   reloads into it only when no one is typing, no sheet is open and nothing is sending. Both versions are exact pins, the
   same in `sw.js` SHELL, `js/cloud.js` and `js/app-update.js` (`test/sync.test.mjs` checks). `?nosw` runs without it.
 - **Look: two kits** (`index.html`, `style.css`): the NUHS kit (`design.anawj.com/v1/`: app.css, app.js, the `.a-*`
-  classes) still draws every screen, and the app kit (app-ui 1.0.0-rc.42 at `core.anawj.com/ui/`: early.js, theme.css,
+  classes) still draws every screen, and the app kit (app-ui 1.0.0-rc.89 at `core.anawj.com/ui/`: early.js, theme.css,
   `theme/index.js` in `js/ui.js`, cool ground; not glass.css or layout.css, which style bare dialogs and buttons) sets the colours: once it has painted (`html[data-look]`) the
   `--a-*` tokens come from its tokens. Look A, NUHS navy accent, light / dark following the phone; each device can change
   look, theme, density and Glass or Solid under Account, "Look on this device". The kit files are in `sw.js` SHELL at
   the same exact version (`test/sync.test.mjs` checks). Kit sheets load before app.css, so the NUHS classes win on ties.
+- **Signed out: the app kit's sign-in screen** (app-ui `signInScreen`, 4 Nov 2026): icon, name and one line over the
+  whole page (the bar hidden), the passcode form (`#gp`, optional name `#gp-name`, Continue) and "Admin sign-in" (Google).
+  Its sheet `ui/ui.css` loads only while signed out (it also styles bare dialogs, which would touch the NUHS sheets) and
+  goes at sign-in. The name is kept for the tab only (sessionStorage, cleared at sign-out) and fills "Your name" on
+  Review. No "Forget this device": signing out already wipes the copy. core.anawj.com blocked: a plain card instead.
 
 ## How to test
 
