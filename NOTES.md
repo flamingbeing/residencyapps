@@ -66,7 +66,7 @@ own Firebase project in Oct 2026 (the people it is about are applicants, and man
   a new passcode sign-in on a device whose last one left answers unsent is refused and says so ("unsent").
 - **Status chip** (live only, beside the account button): Connecting… until the server has answered once, then Synced,
   Sending…, N waiting: offline, Couldn't send. "Not sent yet" only while offline with storage the browser may clear.
-- **Updates** (`sw.js`, app-sync's update module 1.5.2 at `core.anawj.com/update/1.5.2/`): a new version installs and waits; the page
+- **Updates** (`sw.js`, app-ui's app-update module (rc.108) at `core.anawj.com/ui/1.0.0-rc.108/update/`): a new version installs and waits; the page
   reloads into it only when no one is typing, no sheet is open and nothing is sending. Both versions are exact pins, the
   same in `sw.js` SHELL, `js/cloud.js` and `js/app-update.js` (`test/sync.test.mjs` checks). `?nosw` runs without it.
 - **Look: two kits** (`index.html`, `style.css`): the NUHS kit (`design.anawj.com/v1/`: app.css, app.js, the `.a-*`
