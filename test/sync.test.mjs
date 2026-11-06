@@ -13,7 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const APP = path.join(ROOT, 'applicants');
 const read = f => fs.readFileSync(path.join(APP, f), 'utf8');
 const SYNC_VERSION = read('js/cloud.js').match(/core\.anawj\.com\/sync\/(\d+\.\d+\.\d+)\//)[1];
-const UPDATE_VERSION = read('js/app-update.js').match(/core\.anawj\.com\/update\/(\d+\.\d+\.\d+)\//)[1];
+const UPDATE_VERSION = read('js/app-update.js').match(/core\.anawj\.com\/ui\/(\d+\.\d+\.\d+-rc\.\d+)\/update\//)[1];
 // what the app loads: index.js and the app, auth and sync modules (entries.json lists each one's files)
 const ENTRIES = ['app', 'auth', 'sync'];
 const FILES = await (async () => {
@@ -110,20 +110,20 @@ async function setup({ persisted = true } = {}) {
 }
 test('the engine and the update module are pinned to one exact version everywhere', () => {
   assert.equal(SYNC_VERSION, '1.5.2');
-  assert.equal(UPDATE_VERSION, '1.5.2');
+  assert.equal(UPDATE_VERSION, '1.0.0-rc.108');
   assert.ok(FILES.length > 20 || process.env.APP_SYNC_DIR, 'the module files are listed');
   const sw = read('sw.js');
   for (const f of FILES) assert.ok(sw.includes(`'https://core.anawj.com/sync/${SYNC_VERSION}/${f}'`), `sw.js SHELL has sync ${f}`);
-  assert.ok(sw.includes(`'https://core.anawj.com/update/${UPDATE_VERSION}/register.js'`), 'sw.js SHELL has register.js');
-  assert.ok(sw.includes(`importScripts('https://core.anawj.com/update/${UPDATE_VERSION}/sw-core.js')`), 'sw.js uses sw-core at the same version');
+  assert.ok(sw.includes(`'https://core.anawj.com/ui/${UPDATE_VERSION}/update/register.js'`), 'sw.js SHELL has register.js');
+  assert.ok(sw.includes(`importScripts('https://core.anawj.com/ui/${UPDATE_VERSION}/update/sw-core.js')`), 'sw.js uses sw-core at the same version');
   assert.match(sw, /waitForGo: true/, 'a new version waits for the page’s go');
-  assert.doesNotMatch(sw + read('js/cloud.js') + read('js/app-update.js'), /'https:\/\/core\.anawj\.com\/(sync|update)\/(?!\d+\.\d+\.\d+\/)/, 'no moving address');
+  assert.doesNotMatch(sw + read('js/cloud.js') + read('js/app-update.js'), /'https:\/\/core\.anawj\.com\/(sync|update|ui)\/(?!\d+\.\d+\.\d+(-rc\.\d+)?\/)/, 'no moving address');
   assert.equal(new Set([...(sw + read('js/cloud.js')).matchAll(/core\.anawj\.com\/sync\/(\d+\.\d+\.\d+)\//g)].map(m => m[1])).size, 1, 'one sync version');
 });
 
 test('the app kit (app-ui) is pinned to one exact version and kept offline', () => {
   const sw = read('sw.js'), page = read('index.html') + read('js/ui.js');
-  const versions = new Set([...(sw + page).matchAll(/core\.anawj\.com\/ui\/([^/'"]+)\//g)].map(m => m[1]));
+  const versions = new Set([...(sw + page).matchAll(/core\.anawj\.com\/ui\/([^/'"]+)\/(?!update\/)/g)].map(m => m[1]));
   assert.deepEqual([...versions], ['1.0.0-rc.90'], 'one ui version');
   for (const f of ['theme/early.js', 'theme/theme.css', 'theme/index.js', 'theme/switch.js', 'theme/looks/a.js', 'theme/looks/e.js', 'ui/sign-in-screen.js', 'ui/sign-in-sheet.js', 'ui/dom.js', 'ui/ui.css'])
     assert.ok(sw.includes(`'https://core.anawj.com/ui/1.0.0-rc.90/${f}'`), `sw.js SHELL has ui ${f}`);

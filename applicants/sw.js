@@ -1,4 +1,4 @@
-// Residency applications offline support, on the shared update module (app-sync's update module 1.5.2, core.anawj.com/update/): it
+// Residency applications offline support, on the shared update module (app-ui's app-update, core.anawj.com/ui/1.0.0-rc.108/update/): it
 // installs every SHELL file or nothing, and a new version waits (waitForGo) until the page says go, which it does only
 // when no one is typing or sending (js/app-update.js, canReload). The deploy stamps VERSION (tools/stamp-versions.mjs:
 // 'applicants-v1' becomes 'applicants-<date>-<hash>'); never change it by hand. Change the v<N> only when this file's own
@@ -90,12 +90,12 @@ const SHELL = [
   'https://core.anawj.com/sync/1.5.2/src/writes.js',
   'https://core.anawj.com/sync/1.5.2/sync.js',
   // the page half of the update module (register.js), one exact version: the page starts it offline too
-  'https://core.anawj.com/update/1.5.2/register.js',
+  'https://core.anawj.com/ui/1.0.0-rc.108/update/register.js',
 ];
 
 const MANIFEST = {};
 
-importScripts('https://core.anawj.com/update/1.5.2/sw-core.js');
+importScripts('https://core.anawj.com/ui/1.0.0-rc.108/update/sw-core.js');
 AppUpdate.init({
   app: 'applicants', version: VERSION, shell: SHELL, manifest: MANIFEST, waitForGo: true,
   // "Get the latest version" checks for signal by fetching sw.js; the passcode sign-in is never cached
